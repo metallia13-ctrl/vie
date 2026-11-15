@@ -1,0 +1,2416 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroGraph // Mappa Interattiva & Active Recall</title>
+  <style>
+    :root {
+      --bg-dark: #0f141c;
+      --bg-panel: rgba(18, 24, 34, 0.95);
+      --bg-card: rgba(30, 41, 59, 0.82);
+      --border-color: rgba(148, 163, 184, 0.2);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #2dd4bf;
+      --accent-blue: #38bdf8;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-green: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOP BAR */
+    header {
+      min-height: 62px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      gap: 10px;
+      z-index: 25;
+      backdrop-filter: blur(10px);
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .brand-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .search-input, .select-ctrl, .btn-ctrl {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .search-input { width: 175px; }
+
+    .search-input:focus, .select-ctrl:focus, .btn-ctrl:hover {
+      border-color: var(--accent);
+    }
+
+    .btn-ctrl {
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .btn-ctrl.active {
+      background: rgba(45, 212, 191, 0.2);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-ar-quiz {
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
+      border: none;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-index {
+      background: linear-gradient(135deg, #0d9488, #0284c7);
+      border: none;
+      color: #fff;
+    }
+
+    .score-pill {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      color: #4ade80;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* WORKSPACE */
+    .workspace {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: calc(100vh - 62px);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    canvas:active { cursor: grabbing; }
+
+    /* LEGENDA FLOTTANTE */
+    .legend-box {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 14px;
+      width: 330px;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+      font-size: 0.74rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .legend-title {
+      font-weight: 700;
+      font-size: 0.79rem;
+      margin-bottom: 8px;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      margin-bottom: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .color-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-lines {
+      border-top: 1px solid var(--border-color);
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: var(--text-muted);
+    }
+
+    .line-sample {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .line-visual {
+      width: 30px;
+      height: 0;
+      display: inline-block;
+    }
+
+    .line-aff { border-top: 2px solid #38bdf8; }
+    .line-eff { border-top: 2.5px dashed #ef4444; }
+    .line-int { border-top: 2px dotted #94a3b8; }
+    .line-via { border-top: 1.5px solid #2dd4bf; }
+
+    /* SIDEBAR INSPECTOR */
+    .inspector {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: 400px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 18px;
+      z-index: 15;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transform: translateX(430px);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: -8px 0 30px rgba(0, 0, 0, 0.55);
+      overflow-y: auto;
+    }
+
+    .inspector.open { transform: translateX(0); }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .node-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      letter-spacing: 0.4px;
+    }
+
+    .inspector-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    .close-btn:hover { color: #fff; }
+
+    .node-desc {
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: #cbd5e1;
+      background: rgba(15, 23, 42, 0.65);
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .open-sheet-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #0d9488, #0284c7);
+      color: #fff;
+      border: none;
+      padding: 10px 13px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.2s;
+    }
+
+    .open-ar-sheet-btn {
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
+      color: #fff;
+      border: none;
+      padding: 10px 13px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .open-sheet-btn:hover, .open-ar-sheet-btn:hover {
+      opacity: 0.93;
+      transform: translateY(-1px);
+    }
+
+    .pathway-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pathway-pill {
+      background: rgba(45, 212, 191, 0.14);
+      border: 1px solid rgba(45, 212, 191, 0.45);
+      color: #5eead4;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pathway-pill:hover {
+      background: rgba(45, 212, 191, 0.28);
+      color: #fff;
+    }
+
+    .conn-section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .conn-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .conn-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      border-left: 3px solid var(--accent-blue);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .conn-card:hover {
+      background: rgba(30, 41, 59, 0.95);
+      transform: translateX(2px);
+    }
+
+    .conn-card-target {
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .conn-card-via {
+      color: var(--text-muted);
+      font-size: 0.73rem;
+      line-height: 1.35;
+    }
+
+    .zoom-controls {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      display: flex;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    /* MODAL SCHEDA & ACTIVE RECALL */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 20, 0.84);
+      backdrop-filter: blur(10px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal-window {
+      background: #131b26;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 1080px;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.75);
+      overflow: hidden;
+    }
+
+    .modal-top {
+      padding: 16px 22px;
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .modal-body {
+      padding: 22px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* BARRA ACTIVE RECALL NELLA SCHEDA */
+    .ar-toolbar {
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.14), rgba(234, 88, 12, 0.14));
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .ar-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ar-badge-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* SPOILER / FLASHCARD MASK PER ACTIVE RECALL */
+    .ar-mask {
+      position: relative;
+      display: inline-block;
+      border-radius: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .ar-mask.hidden-fact {
+      background: rgba(245, 158, 11, 0.22);
+      border: 1px dashed #f59e0b;
+      color: transparent !important;
+      user-select: none;
+      cursor: pointer;
+      padding: 2px 8px;
+      min-width: 110px;
+    }
+
+    .ar-mask.hidden-fact * {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ar-mask.hidden-fact::after {
+      content: "❓ Clicca per svelare";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.73rem;
+      font-weight: 700;
+      color: #fbbf24;
+      letter-spacing: 0.3px;
+    }
+
+    .ar-mask.revealed-fact {
+      background: rgba(45, 212, 191, 0.12);
+      border-bottom: 2px solid var(--accent);
+      padding: 1px 4px;
+    }
+
+    .ar-self-eval {
+      display: inline-flex;
+      gap: 5px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .eval-btn {
+      border: none;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .eval-ok {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.45);
+    }
+
+    .eval-retry {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.45);
+    }
+
+    .eval-btn.selected-ok {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    .eval-btn.selected-retry {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .chain-container {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .chain-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .chain-steps {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .chain-step {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 155px;
+      flex: 1;
+    }
+
+    .chain-step-num {
+      font-size: 0.66rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chain-step-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .chain-arrow {
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 780px) {
+      .modal-grid { grid-template-columns: 1fr; }
+      .inspector { width: calc(100vw - 24px); }
+    }
+
+    .modal-box {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .modal-box h4 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 6px;
+    }
+
+    /* QUIZ STANDALONE DECK */
+    .quiz-deck-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .quiz-question {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.45;
+    }
+
+    .quiz-answer-box {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+
+    .ext-module-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: linear-gradient(90deg, rgba(13,148,136,0.18), rgba(2,132,199,0.18));
+      border: 1px solid rgba(45, 212, 191, 0.4);
+      padding: 14px 18px;
+      border-radius: 10px;
+    }
+
+    .ext-link-btn {
+      background: var(--accent);
+      color: #0f172a;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span>NeuroGraph // Mappa &amp; Active Recall</span>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="searchInput" class="search-input" placeholder="Cerca struttura, via, fibra...">
+
+      <select id="directionFilter" class="select-ctrl" title="Filtra tipo di collegamento">
+        <option value="all">Tutti i Collegamenti</option>
+        <option value="afferent">Solo Afferenze / Ascendenti (──▶)</option>
+        <option value="efferent">Solo Efferenze / Discendenti (╌╌▶)</option>
+        <option value="integrative">Solo Associativi / Commessurali (┈┈)</option>
+        <option value="pathway_link">Solo Collegamenti ai Nodi "Via"</option>
+      </select>
+
+      <select id="regionFilter" class="select-ctrl" title="Filtra per distretto">
+        <option value="all">Tutti i Distretti + Nodi Vie</option>
+        <option value="Vie">💎 Solo Grandi Vie Nervose</option>
+        <option value="SNP">SNP, Recettori, Fibre e Gangli</option>
+        <option value="Midollo">Midollo Spinale</option>
+        <option value="Tronco">Tronco Encefalico</option>
+        <option value="Cervelletto">Cervelletto</option>
+        <option value="Diencefalo">Diencefalo (Talamo, Ipotalamo, Subtalamo, Abenula)</option>
+        <option value="Basali">Gangli della Base e Meynert/Claustro</option>
+        <option value="Limbico">Sistema Limbico, Ippocampo e Amigdala</option>
+        <option value="Corteccia">Corteccia Telencefalica</option>
+      </select>
+
+      <select id="colorSchemeSelect" class="select-ctrl" title="Codice Colori delle Fonti">
+        <option value="standard">Colori: Standard Fonti (Sens. Blu, Mot. Rosso, Visc. Verde)</option>
+        <option value="tronco_viola">Colori: Variante Nuclei Tronco (Mot. Visc. Viola, Sens. Visc. Verde)</option>
+        <option value="papez_gangli">Colori: Schemi Papez &amp; Dolore/Gangli Base in Rosso</option>
+      </select>
+
+      <button id="blindMapBtn" class="btn-ctrl" title="Nasconde i nomi sulla mappa per farti indovinare i nodi">🙈 Mappa Muta: OFF</button>
+      <button id="layoutToggleBtn" class="btn-ctrl">Vista: Grafo Obsidian</button>
+      <button id="openQuizBtn" class="btn-ctrl btn-ar-quiz">🎯 Quiz Active Recall</button>
+      <button id="openIndexBtn" class="btn-ctrl btn-index">📚 Indice Vie</button>
+      <span class="score-pill" id="globalScorePill">✓ 0 | ✗ 0</span>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <canvas id="graphCanvas"></canvas>
+
+    <!-- LEGENDA -->
+    <div class="legend-box">
+      <div class="legend-title">
+        <span>Codice Colori &amp; Nodi</span>
+        <span id="schemeLabel" style="color:var(--accent);font-weight:600;">Standard</span>
+      </div>
+      <div class="legend-grid" id="legendColors"></div>
+      <div class="legend-lines">
+        <div class="line-sample">
+          <span class="line-visual line-aff"></span>
+          <span><strong>Afferenza / Ascendente</strong> (Continua + impulso ●▶)</span>
+        </div>
+        <div class="line-sample">
+          <span class="line-visual line-eff"></span>
+          <span><strong>Efferenza / Discendente</strong> (Tratteggiata + impulso ●▶)</span>
+        </div>
+        <div class="line-sample">
+          <span class="line-visual line-int"></span>
+          <span><strong>Associativo / Commessurale / Int.</strong> (Puntinata ◀┈▶)</span>
+        </div>
+        <div class="line-sample">
+          <span class="line-visual line-via"></span>
+          <span><strong>💎 Nodo Romboidale = Grande Via</strong> (Doppio clic = Active Recall)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZOOM -->
+    <div class="zoom-controls">
+      <button class="btn-ctrl" id="zoomInBtn">+</button>
+      <button class="btn-ctrl" id="zoomResetBtn">Centra</button>
+      <button class="btn-ctrl" id="zoomOutBtn">−</button>
+    </div>
+
+    <!-- SIDEBAR INSPECTOR -->
+    <aside class="inspector" id="inspectorPanel">
+      <div class="inspector-header">
+        <div>
+          <span class="node-badge" id="inspBadge">Distretto</span>
+          <h2 class="inspector-title" id="inspTitle">Seleziona un nodo</h2>
+        </div>
+        <button class="close-btn" id="closeInspectorBtn" title="Chiudi">✕</button>
+      </div>
+
+      <div class="node-desc" id="inspDesc"></div>
+
+      <div class="action-buttons">
+        <button class="open-sheet-btn" id="openModalSheetBtn">
+          <span>📖 Scheda Studio</span>
+        </button>
+        <button class="open-ar-sheet-btn" id="openModalArBtn">
+          <span>🎯 Testa Nodo (Active Recall)</span>
+        </button>
+      </div>
+
+      <div id="pathwaySection">
+        <div class="conn-section-title">
+          <span>💎 Vie Nervose Collegate a questo Nodo</span>
+        </div>
+        <div class="pathway-pills" id="inspPathways"></div>
+      </div>
+
+      <div>
+        <div class="conn-section-title">
+          <span>📥 Afferenze (In Entrata)</span>
+          <span id="affCount">0</span>
+        </div>
+        <div class="conn-list" id="inspAfferents"></div>
+      </div>
+
+      <div>
+        <div class="conn-section-title">
+          <span>📤 Efferenze (In Uscita)</span>
+          <span id="effCount">0</span>
+        </div>
+        <div class="conn-list" id="inspEfferents"></div>
+      </div>
+
+      <div>
+        <div class="conn-section-title">
+          <span>🔄 Circuiti Associativi / Commessurali / Reciproci</span>
+          <span id="intCount">0</span>
+        </div>
+        <div class="conn-list" id="inspIntegrative"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- MODAL SCHEDA INTERATTIVA & ACTIVE RECALL -->
+  <div class="modal-overlay" id="sheetModal">
+    <div class="modal-window">
+      <div class="modal-top">
+        <div>
+          <span class="node-badge" id="modalBadge">VIA / STRUTTURA</span>
+          <h2 class="inspector-title" id="modalTitle" style="font-size:1.2rem;">Titolo Scheda</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn-ctrl" id="toggleSheetArBtn" style="border-color:#f59e0b;color:#fbbf24;">
+            🎯 Modalità Active Recall: OFF
+          </button>
+          <button class="close-btn" id="closeModalBtn" style="font-size:1.5rem;">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" id="modalBodyContent"></div>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************************************
+     * 1. MODULI DEL SITO DELLE VIE NERVOSE
+     *************************************************************************/
+    const SITO_VIE_MODULES = {
+      propriocezione_cosciente: { title: "Modulo: Via della Propriocezione Cosciente e Tattile Epicritica (Lemnisco Mediale)" },
+      propriocezione_incosciente: { title: "Modulo: Vie della Propriocezione Incosciente (Spino-Cerebellari, Cuneo- e Trigemino-Cerebellare)" },
+      spinotalamico_dolore: { title: "Modulo: Sistema Spino-Talamico (Neo-, Paleo-, Archispino-talamico) e Controllo del Dolore" },
+      sensibilita_viscerale: { title: "Modulo: Vie della Sensibilità Viscerale e Dolore Riferito (Simpatico e Parasimpatico)" },
+      via_gustativa: { title: "Modulo: Via Gustativa (VII, IX, X → Nucleo del Tratto Solitario → Talamo → Insula)" },
+      via_olfattiva: { title: "Modulo: Via Olfattiva (I NC → Bulbo Olfattivo → Stria Olfattiva Laterale → Uncus e Amigdala)" },
+      via_ottica: { title: "Modulo: Via Ottica (II NC → Chiasma Ottico → Diencefalo → Aree Visive)" },
+      via_acustica_vestibolare: { title: "Modulo: Vie Acustica e Vestibolare (VIII NC, Ganglio di Scarpa, Nuclei Cocleari e Vestibolari)" },
+      vie_motorie: { title: "Modulo: Vie Motorie Piramidali (Cortico-Spinale e Cortico-Nucleare) e Altri Fasci Discendenti" },
+      cervelletto_circuiti: { title: "Modulo: Architettura del Cervelletto (Archi-, Paleo-, Neocerebello) e Connessioni Efferenti" },
+      limbico_papez: { title: "Modulo: Sistema Limbico, Ippocampo, Circuito di Papez, Amigdala, Setto e Abenula" },
+      gangli_base_corteccia: { title: "Modulo: Corteccia Cerebrale (Strati I-VI), Gangli della Base e Campi H/H1/H2 di Forel" }
+    };
+
+    /*************************************************************************
+     * 2. CODICI COLORE FEDELI ALLE FONTI
+     *************************************************************************/
+    const COLOR_SCHEMES = {
+      standard: {
+        label: "Standard (Sens. Blu, Mot. Rosso, Visc. Verde)",
+        categories: {
+          som_sens:  { color: "#3b82f6", name: "Sensitiva Somatica / Gen. (Blu)" },
+          prop_sens: { color: "#38bdf8", name: "Propriocettiva / Specifica (Azzurro)" },
+          visc_sens: { color: "#06b6d4", name: "Sensitiva Viscerale (Azzurro/Blu)" },
+          som_mot:   { color: "#ef4444", name: "Motrice Somatica (Rosso)" },
+          visc_mot:  { color: "#22c55e", name: "Motrice Viscerale / SNA (Verde)" },
+          via_hub:   { color: "#2dd4bf", name: "💎 Nodo Grande Via Nervosa" },
+          integr:    { color: "#a855f7", name: "Associativa / Integrativa (Viola)" }
+        }
+      },
+      tronco_viola: {
+        label: "Nuclei Tronco (Mot. Visc. Viola, Sens. Visc. Verde)",
+        categories: {
+          som_sens:  { color: "#3b82f6", name: "Sensitivi Somatici (Blu)" },
+          prop_sens: { color: "#60a5fa", name: "Sensitivi Speciali (Blu chiaro)" },
+          visc_sens: { color: "#22c55e", name: "Sensitivi Viscerali (Verde)" },
+          som_mot:   { color: "#ef4444", name: "Motori Somatici (Rosso)" },
+          visc_mot:  { color: "#a855f7", name: "Motori Viscerali (Viola)" },
+          via_hub:   { color: "#2dd4bf", name: "💎 Nodo Grande Via Nervosa" },
+          integr:    { color: "#cbd5e1", name: "Centri Integrativi / Reticolari" }
+        }
+      },
+      papez_gangli: {
+        label: "Papez / Paleo-Spino / Efferenze GABA in Rosso",
+        categories: {
+          som_sens:  { color: "#3b82f6", name: "Neospino-Tal. / Connessioni Limbiche (Blu)" },
+          prop_sens: { color: "#a855f7", name: "Propriocettiva Incosciente (Viola)" },
+          visc_sens: { color: "#22c55e", name: "Archispino-Tal. / Viscerale (Verde)" },
+          som_mot:   { color: "#ef4444", name: "Motrice / Paleospino / Papez / GABA (Rosso)" },
+          visc_mot:  { color: "#eab308", name: "Nucleo Pallido / Sistema Assile (Ambra)" },
+          via_hub:   { color: "#f43f5e", name: "💎 Nodo Grande Via Nervosa" },
+          integr:    { color: "#38bdf8", name: "Striato / Lemnisco Mediale (Azzurro)" }
+        }
+      }
+    };
+
+    /*************************************************************************
+     * 3. FLASHCARD EXTRA SULLE FIBRE NERVOSE E RECETTORI (DALLE FONTI 1, 2, 4, 6)
+     *************************************************************************/
+    const FIBER_RECEPTOR_CARDS = [
+      {
+        q: "Fibre Aα (o di tipo IA): diametro, mielinizzazione, velocità di conduzione e funzioni?",
+        a: "Fibre mieliniche più grandi e veloci in assoluto: diametro 12-20 µm, velocità di conduzione 70-120 m/sec. Comprendono le fibre afferenti primarie (terminazioni anulospirali) dei fusi neuromuscolari (sensibilità propriocettiva) e le fibre motrici somatiche degli alfa-motoneuroni diretti alle fibre muscolari striate extrafusali (placche motrici).",
+        source: "Fonte 1, 4, 6"
+      },
+      {
+        q: "Fibre Aβ (gruppo IB e gruppo II): diametro, velocità di conduzione e recettori associati?",
+        a: "Tipo IB (10-15 µm, 60-80 m/sec): fibre sensitive degli organi tendinei del Golgi e dei corpuscoli di Ruffini. Gruppo II (5-15 µm, 30-80 m/sec): terminazioni secondarie (a fiorami) dei fusi neuromuscolari, corpuscoli di Meissner e di Pacini e recettori dei follicoli piliferi (sensibilità tattile e pressoria).",
+        source: "Fonte 1, 4, 6"
+      },
+      {
+        q: "Fibre Aγ (motoneuroni gamma): diametro, velocità di conduzione e bersaglio?",
+        a: "Fibre mieliniche motrici con diametro di 3-8 µm e velocità di conduzione di 15-40 m/sec (fino a 80 m/s nel grafico di Erlanger/Gasser). Innervano le estremità delle fibre intrafusali dei fusi neuromuscolari mediante piccole placche motrici.",
+        source: "Fonte 1, 4"
+      },
+      {
+        q: "Fibre Aδ (o di tipo III): diametro, velocità di conduzione e modalità sensitive trasportate?",
+        a: "Fibre mieliniche sottili (diametro 3-8 µm, velocità media 10-30 m/sec). Connesse a terminazioni libere (recettori tipo I e II) e piccoli follicoli piliferi: veicolano il dolore acuto/immediato (1-2 s dopo lo stimolo) ben discriminato, sensibilità termica (freddo e caldo), parte della tattile/pressoria e afferenze viscerali.",
+        source: "Fonte 1, 2, 4, 6"
+      },
+      {
+        q: "Fibre di tipo B: caratteristiche e funzione nel Sistema Nervoso Autonomo?",
+        a: "Fibre mieliniche pregangliari del sistema nervoso autonomo, con diametro di 1-3 µm e velocità di conduzione di 5-15 m/sec (fino a 60 m/s nel grafico generale).",
+        source: "Fonte 1, 4"
+      },
+      {
+        q: "Fibre di tipo C (o di tipo IV): mielinizzazione, velocità, neuropeptidi e funzioni?",
+        a: "Unico gruppo di fibre amieliniche, molto sottili e a conduzione lenta (0,5-2 m/s). Sono connesse a nocicettori polimodali (meccanici, termici, chimici) per il dolore urente/lento e il dolore viscerale, fibre termiche, fibre olfattive e fibre postgangliari del SNA. Rilasciano il neuropeptide CGRP nell'epidermide mediando il riflesso antidromico (plesso assonico).",
+        source: "Fonte 1, 2, 4, 6"
+      },
+      {
+        q: "Quali sono i 5 recettori corpuscolati della sensibilità esterocettiva e i 4 tipi di recettori articolari (Freeman e Wyke)?",
+        a: "Esterocettivi corpuscolati: 1) Dischi tattili di Merkel, 2) Corpuscoli tattili di Meissner, 3) Corpuscoli a clava di Krause, 4) Corpuscoli di Ruffini, 5) Corpuscoli lamellati di Pacini (più le terminazioni libere intorno ai bulbi piliferi). Recettori articolari: Tipo I (simili a Ruffini), Tipo II (simili a Pacini), Tipo III (simili agli organi tendinei del Golgi), Tipo IV (terminazioni libere).",
+        source: "Fonte 2, 4"
+      },
+      {
+        q: "Qual è la differenza tra cellule sensitive ampollari e cilindriche nel contatto con fibre afferenti ed efferenti?",
+        a: "Le cellule ampollari sono avvolte da una fibra afferente primaria a calice con sinapsi a nastro (latenza bassissima), e le fibre efferenti contattano obbligatoriamente la fibra afferente modulandola presinapticamente. Le cellule cilindriche hanno un semplice bottone sinaptico afferente, e le fibre efferenti prendono contatto diretto con la cellula sensoriale stessa.",
+        source: "Fonte 6"
+      }
+    ];
+
+    /*************************************************************************
+     * 4. DATASET COMPLETO NODI (STRUTTURE + GRANDI VIE CON CATENA NEURONALE)
+     *************************************************************************/
+    const NODES = [
+      // ==================== 12 NODI "HUB DELLE GRANDI VIE" ====================
+      {
+        id: "via_lemnisco_mediale", isPathway: true, label: "VIA: Sistema Posteriore / Lemnisco Mediale (Tattile Epicritica e Prop. Cosciente)",
+        region: "Vie", cat: "via_hub", layer: 3, moduleKey: "propriocezione_cosciente",
+        desc: "Trasporta la sensibilità somatica generale esterocettiva tattile epicritica (grafestesia, stereognosia, ileognosia) e propriocettiva cosciente (sensibilità combinata) dai gangli spinali ai cordoni posteriori (fascicoli gracile e cuneato), decussa nel bulbo formando il lemnisco mediale e raggiunge il nucleo VPL del talamo per terminare nella circonvoluzione postcentrale (aree 3, 1, 2 di Brodmann).",
+        chain: [
+          { step: "I Neurone (Corpo)", nodeId: "ganglio_spinale", detail: "Ganglio spinale (prolungamento periferico nel nervo spinale)" },
+          { step: "Branca Centrale", nodeId: "ms_cordone_post", detail: "Radice posteriore → Cordoni posteriori: 1. Fascicolo gracile, 2. Fascicolo cuneato" },
+          { step: "II Neurone (Corpo)", nodeId: "te_gracile_cuneato", detail: "Bulbo: 1. Nucleo del fascicolo gracile, 2. Nucleo del fascicolo cuneato" },
+          { step: "Assone II Neurone", nodeId: "te_gracile_cuneato", detail: "Decussazione nel tronco encefalico → Lemnisco mediale" },
+          { step: "III Neurone", nodeId: "d_talamo_vpl_vpm", detail: "Talamo: Nucleo Ventrale Postero-Laterale (VPL) → Radiazione talamica" },
+          { step: "Arrivo Corticale", nodeId: "cort_somestesica", detail: "Corteccia telencefalica: Circonvoluzione postcentrale (aree 3, 1, 2 di Brodmann)" }
+        ]
+      },
+      {
+        id: "via_spinotalamica", isPathway: true, label: "VIA: Sistema Antero-Laterale / Lemnisco Spinale (Dolorifica, Termica, Tattile Protopatica)",
+        region: "Vie", cat: "via_hub", specCat: "som_mot", layer: 3, moduleKey: "spinotalamico_dolore",
+        desc: "Trasporta la sensibilità esterocettiva dolorifica, termica e tattile protopatica. Comprende: 1) Via Neospino-talamica (in blu, dolore acuto, 3 neuroni diretta al VPL del talamo → corteccia sensitiva primaria); 2) Via Paleospino-talamica (in rosso, reti polineuronali fino alla lamina V, può anche non decussare) e Via Archispino-talamica (in verde, multisinaptiche diffuse ai nuclei intralaminari del talamo), più i tratti spino-reticolari, spino-tettali e spino-mesencefalico.",
+        chain: [
+          { step: "I Neurone", nodeId: "ganglio_spinale", detail: "Ganglio spinale (fibre Aδ per dolore acuto/termica e fibre C amieliniche per dolore urente/lento)" },
+          { step: "II Neurone", nodeId: "ms_corno_post", detail: "Corno posteriore del midollo spinale (lamine I-V) → decussazione commessurale" },
+          { step: "Assone II Neurone", nodeId: "ms_cordone_antlat", detail: "Cordone antero-laterale (tratti spino-talamico anteriore e laterale, spino-reticolare, spino-tettale, spino-mesencefalico) → Lemnisco spinale" },
+          { step: "III Neurone", nodeId: "d_talamo_vpl_vpm", detail: "Talamo: Nucleo VPL (via neospino-talamica) e Nuclei Intralaminari (vie paleo/archispino-talamica e viscerale)" },
+          { step: "Arrivo Corticale", nodeId: "cort_somestesica", detail: "Circonvoluzione postcentrale (aree 3, 1, 2 di Brodmann) tramite radiazione talamica" }
+        ]
+      },
+      {
+        id: "via_spinocerebellare", isPathway: true, label: "VIA: Sistema Spino-Cerebellare (Propriocettiva Incosciente)",
+        region: "Vie", cat: "via_hub", specCat: "prop_sens", layer: 3, moduleKey: "propriocezione_incosciente",
+        desc: "Conduce al Paleocerebello la sensibilità propriocettiva incosciente mediante fibre ad alta velocità di conduzione. Include il fascio spino-cerebellare dorsale/posteriore (diretto, dal nucleo di Clarke nella lamina VII), il fascio spino-cerebellare ventrale/anteriore (crociato, dal nucleo intermedio mediale), la via cuneo-cerebellare (arto superiore), la via spino-olivo-cerebellare e le fibre trigemino-cerebellari.",
+        chain: [
+          { step: "I Neurone", nodeId: "ganglio_spinale", detail: "Ganglio spinale (fibre Aα/Aβ mielinizzate da fusi neuromuscolari e organi tendinei del Golgi)" },
+          { step: "II Neurone", nodeId: "ms_corno_post", detail: "Midollo spinale: 1. Nucleo posteriore di Clarke (lamina VII, diretto), 2. Nucleo intermedio mediale (crociato)" },
+          { step: "Assone II Neurone", nodeId: "ms_cordone_antlat", detail: "Cordone laterale: 1. Tratto spino-cerebellare dorsale (peduncolo inf.), 2. Tratto spino-cerebellare ventrale (peduncolo sup.)" },
+          { step: "Vie Omologhe Craniche", nodeId: "te_trigemino_nuclei", detail: "Via cuneo-cerebellare (arto sup.) e fibre trigemino-cerebellari (muscoli masticatori e oculomotori)" },
+          { step: "Arrivo Cerebellare", nodeId: "cervelletto_corteccia_nuclei", detail: "Corteccia cerebellare del Paleocerebellum (lobo anteriore) senza III neurone talamico" }
+        ]
+      },
+      {
+        id: "via_viscerale_dolore", isPathway: true, label: "VIA: Sensibilità Viscerale (Afferenze Spinali Simpatiche e Troncoencefaliche Parasimpatiche)",
+        region: "Vie", cat: "via_hub", specCat: "visc_sens", layer: 3, moduleKey: "sensibilita_viscerale",
+        desc: "Suddivisa in: 1) Afferenze spinali c.d. simpatiche (ad alta soglia, per riflessi viscerali e dolore viscerale/riferito per convergenza con le fibre somatiche del dermatomero in lamina I o nel talamo); 2) Afferenze troncoencefaliche c.d. parasimpatiche (a bassa soglia, per riflessi fisiologici da barocettori carotidei, chemocettori, recettori cardiaci, polmonari e gastrointestinali via IX e X paio).",
+        chain: [
+          { step: "I Neurone", nodeId: "gangli_viscerali_cranio_spin", detail: "Gangli spinali (afferenze spinali simpatiche) oppure Ganglio petroso (IX) e Ganglio nodoso (X)" },
+          { step: "II Neurone", nodeId: "te_nts_parabrachiale", detail: "Base del corno posteriore midollare (spinali) oppure Nucleo del tratto solitario (troncoencefaliche)" },
+          { step: "Relè Intermedio", nodeId: "te_nts_parabrachiale", detail: "Passaggio diretto al talamo o mediato dal Nucleo Parabrachiale e dalla Formazione Reticolare (verso l'Ipotalamo)" },
+          { step: "III Neurone", nodeId: "d_talamo_vpl_vpm", detail: "Talamo: Nucleo ventromediale (e ventrale posteriore per le afferenze spinali)" },
+          { step: "Termine Corticale", nodeId: "cort_insula_cingolo", detail: "Corteccia telencefalica del lobo dell'Insula (ed Area somestesica primaria per le afferenze spinali)" }
+        ]
+      },
+      {
+        id: "via_gustativa", isPathway: true, label: "VIA: Sensibilità Gustativa (VII, IX, X → Porzione Rostrale del Nucleo del Tratto Solitario)",
+        region: "Vie", cat: "via_hub", layer: 3, moduleKey: "via_gustativa",
+        desc: "Sensibilità viscerale speciale raccolta dai calici gustativi tramite il ganglio genicolato del nervo faciale (VII), il ganglio petroso del glossofaringeo (IX) e il ganglio nodoso del vago (X, epiglottide), le cui fibre centrali raggiungono la porzione rostrale del nucleo del tratto solitario.",
+        chain: [
+          { step: "I Neurone", nodeId: "gangli_viscerali_cranio_spin", detail: "Ganglio genicolato (VII), Ganglio petroso (IX) e Ganglio nodoso (X)" },
+          { step: "II Neurone", nodeId: "te_nts_parabrachiale", detail: "Porzione rostrale del Nucleo del Tratto Solitario (NTS) nel tronco encefalico" },
+          { step: "III Neurone", nodeId: "d_talamo_vpl_vpm", detail: "Talamo (tramite proiezioni ascendenti dirette o via nucleo parabrachiale)" },
+          { step: "Termine Corticale", nodeId: "cort_insula_cingolo", detail: "Corteccia telencefalica gustativa (Insula)" }
+        ]
+      },
+      {
+        id: "via_olfattiva", isPathway: true, label: "VIA: Sensibilità Olfattiva (I Paio → Bulbo Olfattivo → Stria Olfattiva Laterale)",
+        region: "Vie", cat: "via_hub", layer: 5, moduleKey: "via_olfattiva",
+        desc: "Veicolata dal 1° paio di nervi cranici ('falso' nervo cranico annesso al telencefalo con fibre amieliniche di tipo C) verso il bulbo olfattivo; tramite la stria olfattiva laterale si connette direttamente alla corteccia piriforme dell'uncus, al gruppo corticomediale dell'amigdala e invia proiezioni dal rinencefalo a caudato-putamen e pallido.",
+        chain: [
+          { step: "I Neurone", nodeId: "lim_bulbo_olfattivo", detail: "Cellule nervose sensoriali primarie (fibre amieliniche C del I nervo cranico)" },
+          { step: "Stazione Telencefalica", nodeId: "lim_bulbo_olfattivo", detail: "Bulbo olfattivo → Stria olfattiva laterale" },
+          { step: "Bersagli Corticali e Limbici", nodeId: "lim_amigdala", detail: "Corteccia piriforme dell'uncus, gruppo corticomediale dell'Amigdala, Caudato-Putamen e Nucleo Pallido" }
+        ]
+      },
+      {
+        id: "via_ottica", isPathway: true, label: "VIA: Sensibilità Visiva / Ottica (II Paio → Chiasma Ottico → Diencefalo)",
+        region: "Vie", cat: "via_hub", layer: 4, moduleKey: "via_ottica",
+        desc: "Sensibilità specifica veicolata dal 2° paio di nervi cranici ('falso' nervo cranico annesso al diencefalo, con emergenza dal chiasma ottico) verso i centri diencefalici e le aree corticali visive.",
+        chain: [
+          { step: "Nervo Cranico", nodeId: "d_metatalamo_pulvinar", detail: "II paio di nervi cranici (Nervo ottico) → emergenza dal Chiasma ottico (Diencefalo)" },
+          { step: "Relè Diencefalico", nodeId: "d_metatalamo_pulvinar", detail: "Centri talamici/metatalamici del diencefalo e lamina quadrigemina" },
+          { step: "Termine Corticale", nodeId: "cort_visiva_acustica", detail: "Aree corticali sensitive visive del telencefalo" }
+        ]
+      },
+      {
+        id: "via_acustica", isPathway: true, label: "VIA: Sensibilità Acustica (VIII Paio → Nuclei Cocleari e Modulazione Efferente)",
+        region: "Vie", cat: "via_hub", layer: 4, moduleKey: "via_acustica_vestibolare",
+        desc: "Le cellule acustiche interne ed esterne sono contattate da fibre afferenti (dai neuroni oppositopolari/bipolari dell'VIII nervo encefalico) dirette ai nuclei cocleari del tronco encefalico, e da fibre efferenti (indicate in verde e giallo) che prendono contatto con la cellula acustica o con la fibra afferente per modulare il segnale.",
+        chain: [
+          { step: "Recettori e Modulazione", nodeId: "te_vestibolo_cocleare", detail: "Cellule acustiche interne ed esterne (modulate da fibre efferenti verdi/gialle)" },
+          { step: "I Neurone", nodeId: "te_vestibolo_cocleare", detail: "Ganglio spirale dell'VIII nervo statoacustico (cellule oppositopolari/bipolari)" },
+          { step: "II Neurone", nodeId: "te_vestibolo_cocleare", detail: "Nuclei cocleari del tronco encefalico → proiezione ascendente alle aree acustiche" }
+        ]
+      },
+      {
+        id: "via_vestibolare", isPathway: true, label: "VIA: Sensibilità Vestibolare (Ganglio di Scarpa → Nuclei Vestibolari, Archicerebello e FLM)",
+        region: "Vie", cat: "via_hub", layer: 3, moduleKey: "via_acustica_vestibolare",
+        desc: "Sensibilità propriocettiva speciale (VIII paio): dal ganglio vestibolare di Scarpa (cellule bipolari/oppositopolari) raggiunge direttamente l'archicerebello e i nuclei vestibolari (spinale, mediale, superiore). Dal nucleo spinale e mediale nasce la via vestibolo-cerebellare; dal nucleo mediale nasce il fascicolo longitudinale mediale (FLM) con il fascio vestibolo-spinale anteriore per i motoneuroni cervicali; dal nucleo superiore partono vie per i nervi cranici oculomotori.",
+        chain: [
+          { step: "Recettori e I Neurone", nodeId: "te_vestibolo_cocleare", detail: "Organo vestibolare (cellule ampollari a calice e cilindriche) → Ganglio di Scarpa (cellule bipolari)" },
+          { step: "Nuclei Vestibolari e Archicerebello", nodeId: "te_vestibolo_cocleare", detail: "Afferenze dirette all'Archicerebello e ai Nuclei Vestibolari (spinale, mediale, superiore)" },
+          { step: "Vie Efferenti", nodeId: "ms_corno_ant", detail: "Via vestibolo-cerebellare (da n. spinale e mediale); FLM / fascio vestibolo-spinale anteriore (da n. mediale ai motoneuroni cervicali); vie ai nervi cranici (da n. superiore)" }
+        ]
+      },
+      {
+        id: "via_piramidale", isPathway: true, label: "VIA: Sistema Piramidale (Tratti Cortico-Spinale e Cortico-Nucleare)",
+        region: "Vie", cat: "via_hub", specCat: "som_mot", layer: 4, moduleKey: "vie_motorie",
+        desc: "Via della motilità volontaria costituita da due neuroni in serie: il motoneurone superiore (cellule piramidali a glutammato del 5° strato della corteccia motoria, i cui assoni convergono nella corona radiata del centro semiovale e nella capsula interna) e il motoneurone inferiore (nelle corna anteriori del midollo spinale per tronco e arti, o nei nuclei somatomotori dei nervi cranici per testa e parte del collo).",
+        chain: [
+          { step: "Motoneurone Superiore", nodeId: "cort_motoria", detail: "5° strato della corteccia motoria (glutammato) → Corona radiata (centro semiovale) → Capsula interna" },
+          { step: "Tratto Cortico-Nucleare", nodeId: "te_nuclei_motori_cranici", detail: "Raggiunge i nuclei somatomotori dei nervi cranici del tronco encefalico (muscoli di testa e parte del collo)" },
+          { step: "Tratto Cortico-Spinale", nodeId: "ms_corno_ant", detail: "Si connette (direttamente o tramite interneuroni) coi motoneuroni inferiori α e γ nelle corna anteriori del midollo spinale" },
+          { step: "Via Finale Comune", nodeId: "snp_nervi_effettori", detail: "Assone dei motoneuroni inferiori nella radice anteriore e nei nervi spinali/encefalici → muscoli striati scheletrici" }
+        ]
+      },
+      {
+        id: "via_extrapiramidale", isPathway: true, label: "VIA: Altri Fasci Discendenti Motori e Controllo Centrale del Dolore",
+        region: "Vie", cat: "via_hub", specCat: "som_mot", layer: 3, moduleKey: "vie_motorie",
+        desc: "Comprende i sistemi per il controllo dei movimenti automatici e posturali: 1) Via Rubrospinale (dalla porzione magnicellulare del nucleo rosso, controllata dalla regione paravermiana del cervelletto: attiva i flessori degli arti inferiori e inibisce quelli degli arti superiori nella deambulazione); 2) Sistema Reticolospinale; 3) Sistema Vestibolospinale e FLM; 4) Tratto Tettospinale; 5) Vie discendenti del controllo centrale del dolore (PAG, nuclei del rafe / via rafe-spinale e nucleo paragigantocellulare bulbare).",
+        chain: [
+          { step: "Controllo Cerebellare / Striatale", nodeId: "cervelletto_corteccia_nuclei", detail: "Regione paravermiana del cervelletto (in arancione) e proiezioni dal Nucleo Pallido / Subtalamo" },
+          { step: "Nuclei del Tronco Encefalico", nodeId: "te_rubro_tettale_reticolare", detail: "Nucleo Rosso (porzione magnicellulare), Formazione Reticolare, Nuclei Vestibolari, Tetto Mesencefalico, PAG e Rafe" },
+          { step: "Bersagli Spinali", nodeId: "ms_corno_ant", detail: "Motoneuroni inferiori delle corna anteriori (controllo flessori/estensori e postura) e corna posteriori (inibizione del dolore)" }
+        ]
+      },
+      {
+        id: "circuito_papez", isPathway: true, label: "VIA: Circuito di Papez e Connessioni Ippocampo-Setto-Amigdala",
+        region: "Vie", cat: "via_hub", specCat: "som_mot", layer: 5, moduleKey: "limbico_papez",
+        desc: "Circuito per la memoria a breve termine rafforzata dall'espressione emozionale (segnato in rosso in Fig. VIII-28): concatena la corteccia entorinale, l'ippocampo (CA1 stimolata dai collaterali di Schaffer → subiculum), l'alveo, la fimbria, il fornice postcommessurale, i corpi mammillari dell'ipotalamo, il fascio mammillotalamico, i nuclei anteriori del talamo, la corteccia del giro del cingolo e il fascio del cingolo.",
+        chain: [
+          { step: "Ingresso Entorinale", nodeId: "lim_entorinale_paraipp", detail: "Corteccia entorinale (via perforante e via temporoammonica)" },
+          { step: "Ippocampo e Fornice", nodeId: "lim_ippocampo_fornice", detail: "Corno di Ammone (CA1) e Subiculum → Alveo → Fimbria → Fornice postcommessurale" },
+          { step: "Stazione Ipotalamica", nodeId: "d_ipotalamo", detail: "Corpi mammillari dell'ipotalamo → Fascio mammillotalamico" },
+          { step: "Stazione Talamica", nodeId: "d_talamo_limbico_motorio", detail: "Nuclei anteriori del talamo (e nucleo laterale dorsale)" },
+          { step: "Anello Cingolato", nodeId: "cort_insula_cingolo", detail: "Giro del cingolo → Fascio del cingolo → ritorno a Giro paraippocampale e Area entorinale" }
+        ]
+      },
+
+      // ==================== NODI STRUTTURE ANATOMICHE ====================
+      {
+        id: "rec_estero_proprio", label: "Recettori Esterocettivi (Merkel, Meissner, Krause, Ruffini, Pacini) e Propriocettivi (Fusi, Golgi, Articolari I-IV)",
+        region: "SNP", cat: "som_sens", layer: 0, moduleKey: "propriocezione_cosciente",
+        desc: "Gli esterocettori cutanei comprendono meccanocettori corpuscolati (Merkel, Meissner, Krause, Ruffini, Pacini) e terminazioni libere (bulbi piliferi, nocicettori Aδ e C con neuropeptide CGRP per il riflesso antidromico, termocettori come TRPV1). I propriocettori comprendono i fusi neuromuscolari (fibre intrafusali con terminazioni primarie anulospirali Aα/IA e secondarie a fiorami Aβ/II), gli organi tendinei del Golgi (IB) e i recettori articolari di Freeman e Wyke (tipi I-IV)."
+      },
+      {
+        id: "rec_viscerali", label: "Recettori Viscerali (Barocettori, Chemocettori, Osmocettori, Recettori Cardiaci, Polmonari e GI)",
+        region: "SNP", cat: "visc_sens", layer: 0, moduleKey: "sensibilita_viscerale",
+        desc: "Situati nella parete dei visceri e dei vasi: le fibre a bassa soglia rilevano stimoli fisiologici (barocettori e chemocettori carotidei via IX paio; recettori gastrointestinali, cardiaci e polmonari via X paio) accompagnando il parasimpatico; le fibre ad alta soglia (Aδ e C) rilevano stimoli dolorifici viscerali accompagnando il simpatico."
+      },
+      {
+        id: "ganglio_spinale", label: "Ganglio Spinale (Protoneuroni Pseudounipolari a T - Somatici e Viscerali)",
+        region: "SNP", cat: "som_sens", layer: 1, moduleKey: "propriocezione_cosciente",
+        desc: "Situato a livello dei fori intervertebrali lungo la radice posteriore: contiene raggruppamenti specifici di neuroni pseudounipolari a T. I neuroni grandi danno origine a fibre spesse mielinizzate (Aα, Aβ) per la sensibilità esterocettiva epicritica e propriocettiva; i neuroni piccoli danno origine a fibre sottili Aδ e amieliniche C per la sensibilità protopatica, termica, dolorifica e viscerale."
+      },
+      {
+        id: "gangli_viscerali_cranio_spin", label: "Ganglio Nodoso (X), Ganglio Petroso (IX), Ganglio Genicolato (VII) e Catena dell'Ortosimpatico",
+        region: "SNP", cat: "visc_sens", layer: 1, moduleKey: "sensibilita_viscerale",
+        desc: "I gangli petroso (IX) e nodoso (X) contengono i protoneuroni delle afferenze viscerali troncoencefaliche (parasimpatiche) e, insieme al ganglio genicolato (VII), le afferenze gustative. I gangli della catena paravertebrale dell'ortosimpatico (con rami comunicanti bianchi e grigi) e i gangli preaortici (con nervi splancnici) sono attraversati dalle fibre viscerali spinali e contengono i neuroni postgangliari."
+      },
+      {
+        id: "snp_nervi_effettori", label: "Nervo Spinale Misto (Ramo Dorsale e Ventrale), Plessi, Miomero e Dermatomero",
+        region: "SNP", cat: "som_mot", layer: 0, moduleKey: "vie_motorie",
+        desc: "Il nervo spinale è sempre misto (indicato con rosso, verde e blu): la radice posteriore innerva un territorio cutaneo (dermatomero), la radice anteriore innerva un territorio muscolare (miomero) tramite alfa-motoneuroni (fibre extrafusali) e gamma-motoneuroni (fibre intrafusali) più le fibre pregangliari autonome (tipo B) che via sinapsi gangliare inviano fibre postgangliari (tipo C) a muscolo liscio, cuore e ghiandole."
+      },
+      {
+        id: "ms_corno_post", label: "Corno Posteriore del Midollo Spinale (Lamine I-V, Nucleo di Clarke VII e Base Viscerale)",
+        region: "Midollo", cat: "som_sens", layer: 2, moduleKey: "spinotalamico_dolore",
+        desc: "Riceve le fibre della radice posteriore: le lamine I-V accolgono le fibre termiche, dolorifiche e tattili protopatiche (e nella lamina I convergono le afferenze dolorifiche viscerali e somatiche dello stesso segmento causando il dolore riferito); nella base risiedono i neuroni viscerosensitivi; nella lamina VII si trovano il nucleo dorsale di Clarke (spino-cerebellare dorsale) e il nucleo intermedio mediale (spino-cerebellare ventrale)."
+      },
+      {
+        id: "ms_corno_ant", label: "Corno Anteriore e Centri Visceroeffettori del Midollo Spinale (Motoneuroni α, γ e Pregangliari SNA)",
+        region: "Midollo", cat: "som_mot", layer: 2, moduleKey: "vie_motorie",
+        desc: "Nelle corna anteriori risiedono le colonne nucleari dei motoneuroni inferiori (via finale comune somatomotrice per tronco e arti, con innervazione plurisegmentale). Nei neuromeri toraco-lombari (simpatico) e sacrali (parasimpatico, nervi splancnici pelvici) risiedono le cellule radicolari visceroeffettrici pregangliari."
+      },
+      {
+        id: "ms_cordone_post", label: "Cordoni Posteriori del Midollo Spinale (Fascicolo Gracile e Fascicolo Cuneato)",
+        region: "Midollo", cat: "som_sens", layer: 2, moduleKey: "propriocezione_cosciente",
+        desc: "Costituiti dai prolungamenti assonici centrali ascendenti dei protoneuroni gangliari spinali (1. Fascicolo gracile mediale, 2. Fascicolo cuneato laterale) che trasportano al bulbo la sensibilità tattile epicritica e propriocettiva cosciente."
+      },
+      {
+        id: "ms_cordone_antlat", label: "Cordone Antero-Laterale (Tratti Spino-Talamici, Spino-Reticolari e Spino-Cerebellari)",
+        region: "Midollo", cat: "som_sens", specCat: "som_mot", layer: 2, moduleKey: "spinotalamico_dolore",
+        desc: "Contiene i tratti spino-talamico anteriore e laterale, spino-reticolare, spino-tettale e spino-mesencefalico (che nel tronco formano il lemnisco spinale, più il compartimento mediale per le proiezioni spino-ipotalamiche e viscerali) e, nel cordone laterale, i tratti spino-cerebellare dorsale e ventrale."
+      },
+      {
+        id: "te_gracile_cuneato", label: "Bulbo: Nucleo del Fascicolo Gracile e Nucleo del Fascicolo Cuneato",
+        region: "Tronco", cat: "som_sens", layer: 3, moduleKey: "propriocezione_cosciente",
+        desc: "Sede del corpo del II neurone (deutoneurone) del sistema posteriore: i loro assoni decussano nel bulbo formando il lemnisco mediale diretto al nucleo VPL del talamo; danno inoltre origine alla via cuneo-cerebellare per le informazioni propriocettive dell'arto superiore."
+      },
+      {
+        id: "te_trigemino_nuclei", label: "Nuclei Sensitivi del Nervo Trigemino (V): Principale, Radice Discendente e Mesencefalico",
+        region: "Tronco", cat: "som_sens", layer: 3, moduleKey: "propriocezione_incosciente",
+        desc: "Raccolgono la sensibilità di cute e mucose di faccia, naso, bocca, alveoli, denti e la propriocettiva dei muscoli masticatori e oculomotori (che viaggia anche come fibre sensitive nella branca oftalmica attraverso il IV nervo trocleare). Le fibre trigemino-cerebellari raggiungono il lobo anteriore del cervelletto via peduncolo cerebellare inferiore (dai nuclei della radice discendente e principale) o superiore (dal nucleo mesencefalico)."
+      },
+      {
+        id: "te_nts_parabrachiale", label: "Nucleo del Tratto Solitario (Rostrale, Intermedio, Caudale) e Nucleo Parabrachiale",
+        region: "Tronco", cat: "visc_sens", layer: 3, moduleKey: "sensibilita_viscerale",
+        desc: "Il Nucleo del Tratto Solitario (NTS) è diviso in: 1) NTS Rostrale (riceve i recettori gustativi da VII, IX, X); 2) NTS Intermedio (riceve i recettori gastrointestinali da X); 3) NTS Caudale (riceve barocettori e chemocettori carotidei da IX e recettori cardiaci e polmonari da X). Proietta al nucleo motore dorsale del vago (riflessi viscerali) e invia fibre ascendenti al talamo (nucleo ventromediale) e all'ipotalamo direttamente o tramite il Nucleo Parabrachiale e la formazione reticolare."
+      },
+      {
+        id: "te_vestibolo_cocleare", label: "Nuclei Vestibolari (Spinale, Mediale, Superiore), Nuclei Cocleari e Ganglio di Scarpa (VIII)",
+        region: "Tronco", cat: "prop_sens", layer: 3, moduleKey: "via_acustica_vestibolare",
+        desc: "I nuclei cocleari ricevono le fibre afferenti acustiche dall'VIII paio; i nuclei vestibolari sono collegati a doppia via con l'archicerebello, originano la via vestibolo-cerebellare (nucleo spinale + mediale), il fascicolo longitudinale mediale e il fascio vestibolo-spinale anteriore (nucleo mediale) e proiezioni ai nuclei oculomotori (nucleo superiore)."
+      },
+      {
+        id: "te_nuclei_motori_cranici", label: "Colonne dei Nuclei Motori Somatici (Rosso) e Motori Viscerali (Viola/Verde) dei Nervi Cranici",
+        region: "Tronco", cat: "som_mot", layer: 3, moduleKey: "vie_motorie",
+        desc: "Disposti in senso medio-laterale nel pavimento del IV ventricolo: 1) Mediali (adiacenti al solco mediano posteriore): nuclei motori somatici (rosso, es. III, IV, VI, XII) controllati dal tratto cortico-nucleare; 2) Intermedio-mediali: nuclei motori viscerali parasimpatici (viola/verde, es. III, VII con gangli sottomandibolare/sottolinguale, IX, nucleo motore dorsale del vago X) controllati da ipotalamo, amigdala, setto, insula e corteccia prefrontale."
+      },
+      {
+        id: "te_rubro_tettale_reticolare", label: "Nucleo Rosso, Lamina Quadrigemina, Formazione Reticolare, PAG, Nuclei del Rafe e Locus Coeruleus",
+        region: "Tronco", cat: "integr", layer: 3, moduleKey: "vie_motorie",
+        desc: "Il Nucleo Rosso (porzione magnicellulare) riceve dalla regione paravermiana del cervelletto e origina la via rubrospinale; la Lamina Quadrigemina riceve fibre GABA dal pallido e origina il tratto tettospinale; la Formazione Reticolare riceve da limbico (via n. interpeduncolare), setto/abenula, ipotalamo preottico, corteccia prefrontale e grigio pontino, emettendo i fasci ascendenti ventrale e dorsale e il sistema reticolospinale. PAG, nuclei del rafe (serotonina) e n. paragigantocellulare bulbare mediano il controllo discendente del dolore; il Locus Coeruleus (noradrenalina) e i nuclei rostrali del rafe inviano fibre fino al 1° strato corticale."
+      },
+      {
+        id: "te_ponte_oliva_nera", label: "Nuclei del Ponte, Nucleo Olivare Inferiore, Sostanza Nera e Nucleo Interpeduncolare",
+        region: "Tronco", cat: "integr", layer: 3, moduleKey: "cervelletto_circuiti",
+        desc: "Il nucleo olivare inferiore invia fibre rampicanti a glutammato alla corteccia cerebellare; la Sostanza Nera riceve il fascio ascendente ventrale reticolare e fibre GABA dal pallido, e invia fibre dopaminergiche a caudato-putamen e al pallido; il Nucleo Interpeduncolare riceve il tratto abenulo-interpeduncolare (connesso con la regolazione delle funzioni neurovegetative)."
+      },
+      {
+        id: "cerv_peduncoli", label: "Peduncoli Cerebellari (Inferiore e Superiore) e Vie Afferenti Cerebellari",
+        region: "Cervelletto", cat: "prop_sens", layer: 3, moduleKey: "cervelletto_circuiti",
+        desc: "Convogliano al cervelletto i fasci spino-cerebellari dorsale e ventrale, la via cuneo-cerebellare, la via spino-olivo-cerebellare (fibre rampicanti glutammatergiche), la via vestibolo-cerebellare e le fibre trigemino-cerebellari (attraverso il peduncolo cerebellare inferiore dai nuclei principale e discendente, e attraverso il peduncolo cerebellare superiore dal nucleo mesencefalico)."
+      },
+      {
+        id: "cervelletto_corteccia_nuclei", label: "Cervelletto: Archicerebello, Paleocerebello, Neocerebello (Verme, Paraverme, Emisferi e Nuclei Profondi)",
+        region: "Cervelletto", cat: "integr", layer: 3, moduleKey: "cervelletto_circuiti",
+        desc: "Suddiviso in: 1) Archicerebello (connesso con nuclei vestibolari e ganglio di Scarpa); 2) Paleocerebello (connesso con midollo spinale, formazione reticolare e nucleo rosso); 3) Cerebrocerebello/Pontocerebello/Neocerebello (collegato a doppia via con la corteccia telencefalica). Le efferenze nascono da verme (rosa), regione paravermiana (arancione → proietta ai nuclei profondi, al midollo e alla porzione magnicellulare del nucleo rosso per la via rubrospinale) ed emisferi laterali."
+      },
+      {
+        id: "d_talamo_vpl_vpm", label: "Talamo Sensitivo: Nucleo Ventrale Postero-Laterale (VPL), Nucleo Ventromediale e Nuclei Intralaminari",
+        region: "Diencefalo", cat: "som_sens", layer: 4, moduleKey: "propriocezione_cosciente",
+        desc: "Il nucleo VPL contiene il III neurone della via del lemnisco mediale e della via neospino-talamica (proiettando tramite la radiazione talamica alle aree 3, 1, 2 di Brodmann); il nucleo ventromediale (e ventrale posteriore) è il III neurone delle vie sensitive viscerali verso l'Insula; i nuclei intralaminari (non specifici) ricevono le vie paleospino- e archispino-talamica e il compartimento mediale viscerale, inviando fibre eccitatorie diffuse a tutta la corteccia."
+      },
+      {
+        id: "d_metatalamo_pulvinar", label: "Diencefalo Visivo e Acustico: Chiasma Ottico e Vie Centrali di II e VIII Paio",
+        region: "Diencefalo", cat: "som_sens", layer: 4, moduleKey: "via_ottica",
+        desc: "Stazioni diencefaliche annesse al II paio di nervi cranici (nervo ottico / chiasma ottico) e alle proiezioni centrali della sensibilità specifica visiva e acustica verso la corteccia telencefalica."
+      },
+      {
+        id: "d_talamo_limbico_motorio", label: "Talamo Motorio, Limbico ed Epitalamo: Nuclei Anteriori, Laterodorsale, Dorsomediale, Reticolare e Abenula",
+        region: "Diencefalo", cat: "integr", specCat: "som_mot", layer: 4, moduleKey: "limbico_papez",
+        desc: "I nuclei talamici motori ricevono le efferenze GABA dal segmento interno del globo pallido (tramite ansa lenticolare, fascicolo lenticolare H2, campo prerubrale H e fascicolo talamico H1, in rapporto col nucleo reticolare talamico) e riproiettano alla corteccia; i nuclei anteriori e laterodorsale fanno parte del circuito di Papez; il nucleo dorsomediale riceve dall'amigdala; i nuclei dell'abenula (mediale e laterale) ricevono la stria midollare del talamo dal setto ed emettono il tratto abenulo-interpeduncolare."
+      },
+      {
+        id: "d_ipotalamo", label: "Ipotalamo (Area Preottica, Ipotalamo Anteriore, Laterale, Mediale e Corpi Mammillari)",
+        region: "Diencefalo", cat: "visc_mot", layer: 4, moduleKey: "limbico_papez",
+        desc: "Risponde a variazioni di temperatura corporea, osmolarità e concentrazioni ematiche, e riceve afferenze viscerali (via formazione reticolare e proiezioni spino-ipotalamiche), il fornice pre- e post-commessurale (ai corpi mammillari), la stria terminale dall'amigdala e il fascicolo prosencefalico mediale dal setto. Emette il fascio mammillotalamico (Circuito di Papez) e invia impulsi (diretti o via formazione reticolare) ai centri visceroeffettori dei nervi cranici e del midollo spinale."
+      },
+      {
+        id: "gb_striato_pallido_claustro", label: "Gangli della Base (Caudato-Putamen, Accumbens, Globo Pallido Est./Int.), Subtalamo (Campi H1/H2/H) e Meynert",
+        region: "Basali", cat: "integr", layer: 5, moduleKey: "gangli_base_corteccia",
+        desc: "Lo Striato (Caudato-Putamen e Accumbens) riceve dalla corteccia cerebrale, dal rinencefalo, dopamina dalla sostanza nera e 5HT/NA/ACh dalla sostanza reticolare, e proietta con Sostanza P (SP) e GABA al Nucleo Pallido. Il Pallido invia efferenze GABAergiche a: 1) Nuclei talamici → Corteccia (via ansa lenticolare, fascicolo lenticolare H2, campo H e fascicolo talamico H1); 2) Subtalamo (via fascicolo subtalamico, in rapporto con la zona incerta) → Sistema assile; 3) Sostanza nera; 4) Lamina quadrigemina; 5) Sostanza reticolare. Il nucleo di Meynert e la sostanza innominata inviano fibre colinergiche eccitatorie diffuse a tutta la corteccia."
+      },
+      {
+        id: "lim_bulbo_olfattivo", label: "Bulbo Olfattivo, Stria Olfattiva Laterale, Corteccia Piriforme e Rinencefalo",
+        region: "Limbico", cat: "visc_sens", layer: 5, moduleKey: "via_olfattiva",
+        desc: "Riceve il I nervo olfattivo nel telencefalo; tramite la stria olfattiva laterale e la corteccia piriforme dell'uncus si connette diffusamente con il gruppo corticomediale dell'amigdala e invia proiezioni dal rinencefalo a caudato-putamen e al nucleo pallido."
+      },
+      {
+        id: "lim_amigdala", label: "Amigdala / Complesso Amigdaloideo (Gruppi Corticomediale, Basilaterale e Centrale)",
+        region: "Limbico", cat: "integr", layer: 5, moduleKey: "limbico_papez",
+        desc: "Situata nell'estremità rostrale del lobo temporale profondamente alla corteccia piriforme dell'uncus: il gruppo corticomediale riceve da stria olfattiva laterale e corteccia piriforme; i gruppi basilaterale e centrale sono connessi col corticomediale e ricevono da corteccia prefrontale, temporale, giro del cingolo ed entorinale. Emette la Stria Terminale (nel solco optostriato) e la Banda Diagonale verso setto, area preottica/ipotalamo anteriore e nucleo talamico dorsomediale, oltre a inviare impulsi diretti ai neuroni visceroeffettori."
+      },
+      {
+        id: "lim_ippocampo_fornice", label: "Ippocampo (Giro Dentato, Corno di Ammone CA1, Subiculum), Fornice e Complesso Settale",
+        region: "Limbico", cat: "integr", specCat: "som_mot", layer: 5, moduleKey: "limbico_papez",
+        desc: "Le cellule piramidali CA1 del Corno di Ammone (stimolate dai collaterali di Schaffer) proiettano al Subiculum e, tramite alveo, fimbria e Fornice, si dividono a livello della commessura anteriore in: 1) Fornice pre-commissurale (connessioni reciproche ippocampico-settali con i nuclei settali laterali, proiezioni subicolari a setto, nucleo accumbens, ipotalamo anteriore e sostanza innominata, e proiezione setto-ippocampale colinergica e gabaergica dai nuclei settali mediali e banda diagonale); 2) Fornice post-commessurale (ai corpi mammillari e al nucleo talamico laterale dorsale). Il Setto proietta inoltre via fascicolo prosencefalico mediale (a ipotalamo, VTA, locus coeruleus, rafe dorsale), via stria midollare (all'abenula) e direttamente ai neuroni visceroeffettori."
+      },
+      {
+        id: "lim_entorinale_paraipp", label: "Corteccia Entorinale e Giro Paraippocampale (Via Perforante e Temporoammonica)",
+        region: "Limbico", cat: "integr", specCat: "som_mot", layer: 5, moduleKey: "limbico_papez",
+        desc: "Il Subiculum è connesso con la corteccia entorinale, collegata a sua volta col giro paraippocampale, che intrattiene estese connessioni reciproche polisinaptiche con le aree associative dell'isocorteccia frontale, temporale, parietale e occipitale e con l'amigdala; dall'area entorinale partono la via perforante e la via temporoammonica dirette all'ippocampo."
+      },
+      {
+        id: "cort_somestesica", label: "Corteccia Somestesica Primaria (Circonvoluzione Postcentrale: Aree 3a, 3b, 1, 2 di Brodmann)",
+        region: "Corteccia", cat: "som_sens", layer: 6, moduleKey: "propriocezione_cosciente",
+        desc: "Stazione corticale d'arrivo (neuroni integratori) della radiazione talamica dal nucleo VPL per il sistema posteriore (lemnisco mediale), per il sistema antero-laterale (neospino-talamico) e per le afferenze spinali della sensibilità viscerale e del dolore riferito."
+      },
+      {
+        id: "cort_visiva_acustica", label: "Aree Corticali della Sensibilità Specifica (Visiva e Acustica)",
+        region: "Corteccia", cat: "som_sens", layer: 6, moduleKey: "via_ottica",
+        desc: "Aree sensitive corticali a cui vengono proiettate le vie afferenti della sensibilità specifica visiva (II paio) e acustica (VIII paio)."
+      },
+      {
+        id: "cort_insula_cingolo", label: "Corteccia del Lobo dell'Insula e Corteccia del Giro del Cingolo",
+        region: "Corteccia", cat: "visc_sens", specCat: "som_mot", layer: 6, moduleKey: "sensibilita_viscerale",
+        desc: "La corteccia dell'Insula è il termine delle proiezioni centrali della sensibilità viscerale (dal nucleo ventromediale del talamo) e invia anche impulsi diretti ai neuroni visceroeffettori; il Giro del Cingolo riceve dai nuclei anteriori del talamo nel Circuito di Papez, proietta all'amigdala e invia il fascio del cingolo all'area entorinale."
+      },
+      {
+        id: "cort_motoria", label: "Corteccia Motoria (Strato V Piramidale e Strato VI Polimorfo), Corona Radiata e Capsula Interna",
+        region: "Corteccia", cat: "som_mot", layer: 6, moduleKey: "vie_motorie",
+        desc: "Dal 5° strato (cellule piramidali a glutammato) hanno origine le vie motrici discendenti (tratti cortico-spinale e cortico-nucleare) che convergono nel centro semiovale formando la corona radiata e attraversano la capsula interna; dal 6° strato polimorfo originano le efferenze cortico-talamiche."
+      },
+      {
+        id: "cort_associativa", label: "Isocorteccia Associativa (Strati I-VI): Fibre Associative, Commessurali (Corpo Calloso) e Prefrontale Mediale",
+        region: "Corteccia", cat: "integr", layer: 6, moduleKey: "gangli_base_corteccia",
+        desc: "Tutti i tipi di corteccia ricevono fino al 1° strato fibre monoaminergiche ad azione inibitoria (noradrenergiche dal locus coeruleus e serotoninergiche dai nuclei rostrali del rafe) e fibre eccitatorie diffuse dai nuclei talamici non specifici e dal nucleo di Meynert. Il 2° e soprattutto il 3° strato ricevono e danno origine al maggior contingente di fibre efferenti: le fibre di associazione (brevi o lunghe, tra colonne/moduli dello stesso emisfero) e le fibre commessurali (Corpo Calloso, tra i due emisferi). La corteccia prefrontale proietta inoltre a setto, amigdala, ipotalamo, abenula/interpeduncolare e direttamente ai neuroni visceroeffettori."
+      }
+    ];
+
+    /*************************************************************************
+     * 5. DATASET COLLEGAMENTI COMPLETO (CON CITAZIONE DELLE FONTI)
+     *************************************************************************/
+    const LINKS = [
+      // 1. Sistema Posteriore (Lemnisco Mediale)
+      { source: "rec_estero_proprio", target: "ganglio_spinale", dir: "afferent", cat: "som_sens", via: "Prolungamento assonico periferico nel nervo spinale (fibre mieliniche Aα/IA e Aβ/II da propriocettori e meccanocettori) [Fonte 1, 2, 4, 6]" },
+      { source: "ganglio_spinale", target: "ms_cordone_post", dir: "afferent", cat: "som_sens", via: "Radice posteriore del nervo spinale → Cordoni posteriori (1. Fascicolo gracile, 2. Fascicolo cuneato) [Fonte 2]" },
+      { source: "ms_cordone_post", target: "te_gracile_cuneato", dir: "afferent", cat: "som_sens", via: "Ascesa diretta ai nuclei del fascicolo gracile e del fascicolo cuneato nel bulbo (II neurone) [Fonte 2]" },
+      { source: "te_gracile_cuneato", target: "d_talamo_vpl_vpm", dir: "afferent", cat: "som_sens", via: "Decussazione nel tronco encefalico → Lemnisco mediale fino al nucleo VPL del talamo (III neurone) [Fonte 2]" },
+      { source: "d_talamo_vpl_vpm", target: "cort_somestesica", dir: "afferent", cat: "som_sens", via: "Radiazione talamica → Circonvoluzione postcentrale (aree 3a, 3b, 1, 2 di Brodmann) [Fonte 2]" },
+      { source: "ms_cordone_post", target: "via_lemnisco_mediale", dir: "pathway_link", cat: "via_hub", via: "Tratto midollare della Via del Lemnisco Mediale (sensibilità combinata) [Fonte 2, 4]" },
+      { source: "te_gracile_cuneato", target: "via_lemnisco_mediale", dir: "pathway_link", cat: "via_hub", via: "Deutoneurone bulbare della Via del Lemnisco Mediale [Fonte 2, 4]" },
+      { source: "via_lemnisco_mediale", target: "cort_somestesica", dir: "pathway_link", cat: "via_hub", via: "Termine corticale per grafestesia, stereognosia, ileognosia e propriocezione cosciente [Fonte 2]" },
+
+      // 2. Sistema Antero-Laterale (Spino-Talamico) e Riflessi Spinali
+      { source: "ganglio_spinale", target: "ms_corno_post", dir: "afferent", cat: "som_sens", via: "Radice posteriore → Corna posteriori (lamine I-V) mediante fibre Aδ (dolore acuto/termica) e C (dolore lento/viscerale) [Fonte 1, 2, 4, 6]" },
+      { source: "ms_corno_post", target: "ms_cordone_antlat", dir: "afferent", cat: "som_sens", specCat: "som_mot", via: "Decussazione delle fibre del II neurone → ingresso nel cordone antero-laterale (fascio spino-talamico anteriore e laterale) [Fonte 1, 2]" },
+      { source: "ms_cordone_antlat", target: "d_talamo_vpl_vpm", dir: "afferent", cat: "som_sens", specCat: "som_mot", via: "Lemnisco spinale: Via Neospino-talamica (al VPL) e Vie Paleospino-/Archispino-talamica e viscerale mediale (ai nuclei intralaminari) [Fonte 1, 2, 7, 11]" },
+      { source: "ms_cordone_antlat", target: "te_rubro_tettale_reticolare", dir: "afferent", cat: "som_sens", specCat: "som_mot", via: "Tratti spino-reticolari, spino-tettali e spino-mesencefalico [Fonte 2]" },
+      { source: "ganglio_spinale", target: "ms_corno_ant", dir: "afferent", cat: "prop_sens", via: "Collaterale diretta delle fibre Aα dei fusi neuromuscolari sui motoneuroni somatici (arco riflesso monosinaptico miotatico/patellare) [Fonte 1, 2, 6]" },
+      { source: "ms_corno_post", target: "ms_corno_ant", dir: "integrative", cat: "integr", via: "Reti neuronali della sostanza grigia per gli archi riflessi spinali somatomotori e visceroeffettori [Fonte 1, 10]" },
+      { source: "ms_cordone_antlat", target: "via_spinotalamica", dir: "pathway_link", cat: "via_hub", via: "Fasci ascendenti del Sistema Antero-Laterale (Neo-, Paleo-, Archispino-talamico) [Fonte 1, 2]" },
+      { source: "via_spinotalamica", target: "d_talamo_vpl_vpm", dir: "pathway_link", cat: "via_hub", via: "Proiezione del Lemnisco Spinale al talamo dorsale e intralaminare [Fonte 1, 2, 7, 11]" },
+
+      // 3. Sistema Spino-Cerebellare e Circuiti Cerebellari
+      { source: "ms_cordone_antlat", target: "cerv_peduncoli", dir: "afferent", cat: "prop_sens", via: "Fascio spino-cerebellare dorsale (dal nucleo di Clarke lamina VII, diretto) e ventrale (dal nucleo intermedio mediale, crociato) [Fonte 1, 2]" },
+      { source: "te_gracile_cuneato", target: "cerv_peduncoli", dir: "afferent", cat: "prop_sens", via: "Via cuneo-cerebellare (omologa al fascio spino-cerebellare dorsale per l'arto superiore) [Fonte 2]" },
+      { source: "rec_estero_proprio", target: "te_trigemino_nuclei", dir: "afferent", cat: "som_sens", via: "Sensibilità di faccia, naso, bocca, denti e propriocettiva incosciente dei muscoli masticatori e oculomotori (V paio) [Fonte 2, 9]" },
+      { source: "te_trigemino_nuclei", target: "cerv_peduncoli", dir: "afferent", cat: "prop_sens", via: "Fibre trigemino-cerebellari via peduncolo cerebellare inferiore (da n. principale e discendente) e superiore (da n. mesencefalico) [Fonte 2]" },
+      { source: "te_ponte_oliva_nera", target: "cerv_peduncoli", dir: "afferent", cat: "integr", via: "Fibre rampicanti a glutammato dal nucleo olivare inferiore (via spino-olivo-cerebellare) e proiezioni dal ponte al pontocerebello [Fonte 1, 2]" },
+      { source: "cerv_peduncoli", target: "cervelletto_corteccia_nuclei", dir: "afferent", cat: "prop_sens", via: "Ingresso al Paleocerebello (lobo anteriore), all'Archicerebello e al Cerebrocerebello (cellule dei granuli → glutammato alle cellule di Purkinje) [Fonte 1, 2]" },
+      { source: "cervelletto_corteccia_nuclei", target: "te_rubro_tettale_reticolare", dir: "efferent", cat: "som_mot", via: "Efferenze dalla regione paravermiana (arancione) e dal paleocerebello alla porzione magnicellulare del Nucleo Rosso e alla formazione reticolare [Fonte 1]" },
+      { source: "cervelletto_corteccia_nuclei", target: "te_vestibolo_cocleare", dir: "integrative", cat: "prop_sens", via: "Connessioni reciproche tra Archicerebello/verme (rosa) e i nuclei vestibolari [Fonte 1]" },
+      { source: "cervelletto_corteccia_nuclei", target: "cort_motoria", dir: "integrative", cat: "som_mot", via: "Collegamento a doppia via tra Cerebrocerebello (pontocerebello/neocerebello, emisferi laterali) e corteccia telencefalica [Fonte 1]" },
+      { source: "cerv_peduncoli", target: "via_spinocerebellare", dir: "pathway_link", cat: "via_hub", via: "Conduzione della sensibilità propriocettiva incosciente al Paleocerebello [Fonte 1, 2]" },
+      { source: "via_spinocerebellare", target: "cervelletto_corteccia_nuclei", dir: "pathway_link", cat: "via_hub", via: "Termine nella corteccia cerebellare del Paleocerebellum [Fonte 1, 2]" },
+
+      // 4. Sensibilità Viscerale, Dolore Riferito e Via Gustativa
+      { source: "rec_viscerali", target: "ganglio_spinale", dir: "afferent", cat: "visc_sens", via: "Afferenze viscerali spinali c.d. simpatiche ad alta soglia (attraverso plessi, gangli prevertebrali, nn. splancnici, catena simpatica e ramo comunicante bianco) [Fonte 1, 2, 5]" },
+      { source: "rec_viscerali", target: "gangli_viscerali_cranio_spin", dir: "afferent", cat: "visc_sens", via: "Afferenze troncoencefaliche c.d. parasimpatiche a bassa soglia: baro/chemocettori carotidei al ganglio petroso (IX); recettori GI, cardiaci e polmonari al ganglio nodoso (X) [Fonte 1, 2, 5]" },
+      { source: "gangli_viscerali_cranio_spin", target: "te_nts_parabrachiale", dir: "afferent", cat: "visc_sens", via: "Prolungamento centrale al Nucleo del Tratto Solitario: rostrale (gusto VII, IX, X), intermedio (GI da X), caudale (baro/chemocettori IX, cuore/polmoni X) [Fonte 1, 5]" },
+      { source: "ms_corno_post", target: "te_nts_parabrachiale", dir: "afferent", cat: "visc_sens", via: "Proiezione viscerosensitiva dai neuroni della base del corno posteriore al Nucleo Parabrachiale [Fonte 1, 5]" },
+      { source: "ms_corno_post", target: "d_talamo_vpl_vpm", dir: "afferent", cat: "visc_sens", via: "Via ascendente viscerale diretta dal corno posteriore al Nucleo Ventromediale e Ventrale Posteriore del talamo (con convergenza per il dolore riferito) [Fonte 1, 5]" },
+      { source: "te_nts_parabrachiale", target: "d_talamo_vpl_vpm", dir: "afferent", cat: "visc_sens", via: "Proiezioni centrali dal Nucleo del Tratto Solitario e dal Nucleo Parabrachiale al Nucleo Ventromediale del talamo (III neurone) [Fonte 1, 5]" },
+      { source: "te_nts_parabrachiale", target: "d_ipotalamo", dir: "afferent", cat: "visc_sens", via: "Informazioni viscerosensitive inviate attraverso la formazione reticolare principalmente all'Ipotalamo [Fonte 2]" },
+      { source: "ms_cordone_antlat", target: "d_ipotalamo", dir: "afferent", cat: "visc_sens", via: "Proiezioni spino-ipotalamiche nel sistema delle fibre ascendenti protopatiche/viscerali [Fonte 11]" },
+      { source: "te_nts_parabrachiale", target: "te_nuclei_motori_cranici", dir: "integrative", cat: "visc_mot", via: "Attività riflesse viscerali autonome con il Nucleo Motore Dorsale del Vago [Fonte 1, 5]" },
+      { source: "d_talamo_vpl_vpm", target: "cort_insula_cingolo", dir: "afferent", cat: "visc_sens", via: "Proiezione dal Nucleo Ventromediale del talamo alla Corteccia telencefalica del lobo dell'Insula (Termine) [Fonte 1, 5]" },
+      { source: "te_nts_parabrachiale", target: "via_viscerale_dolore", dir: "pathway_link", cat: "via_hub", via: "Stazione centrale delle Vie della Sensibilità Viscerale [Fonte 1, 5]" },
+      { source: "via_viscerale_dolore", target: "cort_insula_cingolo", dir: "pathway_link", cat: "via_hub", via: "Termine corticale della sensibilità viscerale nell'Insula [Fonte 1, 5]" },
+      { source: "gangli_viscerali_cranio_spin", target: "via_gustativa", dir: "pathway_link", cat: "via_hub", via: "Afferenze viscerali speciali gustative da VII (ganglio genicolato), IX (petroso) e X (nodoso, calici epiglottide) [Fonte 1, 2, 9]" },
+      { source: "via_gustativa", target: "te_nts_parabrachiale", dir: "pathway_link", cat: "via_hub", via: "Arrivo nella porzione rostrale del Nucleo del Tratto Solitario [Fonte 1]" },
+
+      // 5. Vie Specifiche: Olfattiva, Ottica, Acustica, Vestibolare
+      { source: "lim_bulbo_olfattivo", target: "via_olfattiva", dir: "pathway_link", cat: "via_hub", via: "I nervo cranico (Olfattivo, emergenza dal bulbo olfattivo nel telencefalo) [Fonte 2, 4, 9]" },
+      { source: "lim_bulbo_olfattivo", target: "lim_amigdala", dir: "afferent", cat: "visc_sens", via: "Connessioni diffuse della stria olfattiva laterale e della corteccia piriforme col gruppo nucleare corticomediale dell'amigdala [Fonte 2]" },
+      { source: "via_olfattiva", target: "lim_amigdala", dir: "pathway_link", cat: "via_hub", via: "Proiezione olfattiva diretta al complesso amigdaloideo e alla corteccia piriforme [Fonte 2]" },
+      { source: "d_metatalamo_pulvinar", target: "cort_visiva_acustica", dir: "afferent", cat: "som_sens", via: "Proiezione delle vie ottiche (II paio, diencefalo) e acustiche (VIII paio) alle rispettive aree sensitive corticali [Fonte 2, 4, 9]" },
+      { source: "via_ottica", target: "d_metatalamo_pulvinar", dir: "pathway_link", cat: "via_hub", via: "II nervo cranico (Ottico, emergenza dal chiasma ottico nel diencefalo) [Fonte 2, 4, 9]" },
+      { source: "via_ottica", target: "cort_visiva_acustica", dir: "pathway_link", cat: "via_hub", via: "Termine corticale della Via Visiva [Fonte 2, 4]" },
+      { source: "te_vestibolo_cocleare", target: "via_acustica", dir: "pathway_link", cat: "via_hub", via: "Fibre afferenti dalle cellule acustiche interne/esterne ai nuclei cocleari + fibre efferenti modulanti (verdi/gialle) [Fonte 1, 4, 9]" },
+      { source: "via_acustica", target: "cort_visiva_acustica", dir: "pathway_link", cat: "via_hub", via: "Proiezione centrale della Via Acustica [Fonte 1, 2]" },
+      { source: "te_vestibolo_cocleare", target: "cerv_peduncoli", dir: "afferent", cat: "prop_sens", via: "Afferenze dirette dal Ganglio di Scarpa all'Archicerebello + Via vestibolo-cerebellare dal nucleo spinale e mediale [Fonte 1]" },
+      { source: "te_vestibolo_cocleare", target: "te_nuclei_motori_cranici", dir: "efferent", cat: "prop_sens", via: "Vie originate dal nucleo vestibolare superiore dirette a raggiungere i nervi cranici oculomotori [Fonte 1]" },
+      { source: "te_vestibolo_cocleare", target: "via_vestibolare", dir: "pathway_link", cat: "via_hub", via: "Stazione nucleare e gangliare (Scarpa) della Via Vestibolare (VIII paio) [Fonte 1, 4, 9]" },
+
+      // 6. Gangli della Base, Subtalamo, Campi di Forel, Sistema Limbico e Circuito di Papez
+      { source: "cort_associativa", target: "gb_striato_pallido_claustro", dir: "efferent", cat: "som_mot", via: "Connessioni afferenti dalla corteccia cerebrale allo striato (putamen o nucleo caudato) [Fonte 6]" },
+      { source: "lim_bulbo_olfattivo", target: "gb_striato_pallido_claustro", dir: "afferent", cat: "visc_sens", via: "Proiezioni dal Rinencefalo a Caudato-Putamen e al Nucleo Pallido [Fonte 6]" },
+      { source: "te_ponte_oliva_nera", target: "gb_striato_pallido_claustro", dir: "afferent", cat: "integr", via: "Fibre a Dopamina dalla Sostanza Nera a Caudato-Putamen e al Nucleo Pallido [Fonte 6]" },
+      { source: "te_rubro_tettale_reticolare", target: "gb_striato_pallido_claustro", dir: "afferent", cat: "integr", via: "Fibre a 5HT, NA e ACh dalla Sostanza Reticolare a Caudato-Putamen e al Nucleo Pallido [Fonte 6]" },
+      { source: "gb_striato_pallido_claustro", target: "d_talamo_limbico_motorio", dir: "efferent", cat: "som_mot", via: "Dal segmento interno del Globo Pallido (GABA) → Ansa lenticolare, Fascicolo lenticolare (H2), Campo H e Fascicolo talamico (H1) → Nuclei Talamici [Fonte 6]" },
+      { source: "d_talamo_limbico_motorio", target: "cort_motoria", dir: "afferent", cat: "som_mot", via: "Chiusura del circuito cortico-strio-pallido-talamo-corticale verso la corteccia cerebrale [Fonte 6]" },
+      { source: "gb_striato_pallido_claustro", target: "te_ponte_oliva_nera", dir: "efferent", cat: "som_mot", via: "Efferenze a GABA dal Nucleo Pallido alla Sostanza Nera [Fonte 6]" },
+      { source: "gb_striato_pallido_claustro", target: "te_rubro_tettale_reticolare", dir: "efferent", cat: "som_mot", via: "Efferenze a GABA dal Nucleo Pallido a Lamina Quadrigemina e Sostanza Reticolare + proiezione dal Subtalamo al Sistema Assile [Fonte 6]" },
+      { source: "gb_striato_pallido_claustro", target: "cort_associativa", dir: "afferent", cat: "integr", via: "Fibre eccitatorie diffuse a tutte le aree corticali dai nuclei colinergici basali del prosencefalo (nucleo di Meynert, sostanza innominata) [Fonte 3]" },
+      { source: "d_talamo_vpl_vpm", target: "cort_associativa", dir: "afferent", cat: "integr", via: "Fibre eccitatorie diffuse a tutte le aree della corteccia dai nuclei non specifici del talamo [Fonte 3]" },
+
+      // Circuito di Papez, Ippocampo, Setto, Amigdala e Abenula
+      { source: "cort_associativa", target: "lim_entorinale_paraipp", dir: "integrative", cat: "integr", via: "Connessioni reciproche polisinaptiche tra aree frontali, temporali, parietali, occipitali e il giro paraippocampale / corteccia entorinale [Fonte 3]" },
+      { source: "lim_entorinale_paraipp", target: "lim_ippocampo_fornice", dir: "integrative", cat: "integr", specCat: "som_mot", via: "Via perforante e Via temporoammonica all'ippocampo + ritorno efferente da CA1 (collaterali di Schaffer) → Subiculum → Corteccia entorinale [Fonte 3]" },
+      { source: "lim_ippocampo_fornice", target: "gb_striato_pallido_claustro", dir: "efferent", cat: "integr", via: "Fibre del fornice pre-commissurale (dal subiculum) al Nucleo Accumbens dello striato ventrale e alla Sostanza Innominata [Fonte 2, 3]" },
+      { source: "lim_ippocampo_fornice", target: "d_ipotalamo", dir: "efferent", cat: "integr", specCat: "som_mot", via: "Fornice post-commessurale ai Corpi Mammillari + Fornice pre-commissurale all'ipotalamo anteriore + Fascicolo prosencefalico mediale dal Setto [Fonte 2, 3]" },
+      { source: "lim_ippocampo_fornice", target: "d_talamo_limbico_motorio", dir: "efferent", cat: "integr", specCat: "som_mot", via: "Fornice post-commessurale al nucleo laterale dorsale del talamo + Stria midollare del talamo (dai nuclei settali post./med.) ai nuclei dell'Abenula [Fonte 2, 3]" },
+      { source: "lim_ippocampo_fornice", target: "te_rubro_tettale_reticolare", dir: "efferent", cat: "integr", via: "Fibre settali nel fascicolo prosencefalico mediale fino a VTA, Locus Coeruleus e Nucleo Dorsale del Rafe [Fonte 2]" },
+      { source: "d_ipotalamo", target: "d_talamo_limbico_motorio", dir: "afferent", cat: "integr", specCat: "som_mot", via: "Fascio Mammillotalamico dai corpi mammillari ai nuclei anteriori del talamo (Circuito di Papez) [Fonte 3]" },
+      { source: "d_talamo_limbico_motorio", target: "cort_insula_cingolo", dir: "afferent", cat: "integr", specCat: "som_mot", via: "Proiezione dai nuclei anteriori del talamo alla corteccia del Giro del Cingolo (Circuito di Papez) [Fonte 3]" },
+      { source: "cort_insula_cingolo", target: "lim_entorinale_paraipp", dir: "efferent", cat: "integr", specCat: "som_mot", via: "Fascio del Cingolo verso il giro paraippocampale e l'area entorinale (chiusura del Circuito di Papez) [Fonte 3]" },
+      { source: "lim_ippocampo_fornice", target: "circuito_papez", dir: "pathway_link", cat: "via_hub", via: "Snodo ippocampale e fornice del Circuito di Papez (in rosso in Fig. VIII-28) [Fonte 3]" },
+      { source: "circuito_papez", target: "cort_insula_cingolo", dir: "pathway_link", cat: "via_hub", via: "Tratto talamo-cingolato del Circuito di Papez [Fonte 3]" },
+
+      { source: "cort_associativa", target: "lim_amigdala", dir: "afferent", cat: "integr", via: "Afferenze dalla corteccia prefrontale e temporale ai gruppi basilaterale e centrale dell'amigdala [Fonte 2]" },
+      { source: "lim_entorinale_paraipp", target: "lim_amigdala", dir: "integrative", cat: "integr", via: "Connessioni tra giro paraippocampale, corteccia entorinale, giro del cingolo e complesso amigdaloideo [Fonte 2, 3]" },
+      { source: "lim_amigdala", target: "lim_ippocampo_fornice", dir: "efferent", cat: "integr", via: "Stria Terminale (nel solco optostriato) e Banda Diagonale verso la regione del setto [Fonte 2, 3]" },
+      { source: "lim_amigdala", target: "d_ipotalamo", dir: "efferent", cat: "visc_mot", via: "Fibre della Stria Terminale verso l'area preottica e l'ipotalamo anteriore [Fonte 2, 3]" },
+      { source: "d_talamo_limbico_motorio", target: "te_ponte_oliva_nera", dir: "efferent", cat: "integr", via: "Tratto Abenulo-Interpeduncolare (dal nucleo mediale dell'abenula, ipotalamo preottico e corteccia prefrontale al nucleo interpeduncolare) [Fonte 2, 7]" },
+      { source: "te_ponte_oliva_nera", target: "te_rubro_tettale_reticolare", dir: "integrative", cat: "integr", via: "Afferenze limbiche alla formazione reticolare (via n. interpeduncolare) e Fascio Ascendente Ventrale reticolare per Sostanza Nera e N. Interpeduncolare [Fonte 7]" },
+
+      // 7. Organizzazione Laminare Corticale (Strati I-VI) e Sistemi Efferenti
+      { source: "te_rubro_tettale_reticolare", target: "cort_associativa", dir: "afferent", cat: "visc_mot", via: "Fibre monoaminergiche che salgono fino al 1° strato corticale con azione inibitoria: noradrenergiche (locus coeruleus) e serotoninergiche (nuclei rostrali del rafe) [Fonte 1, 3]" },
+      { source: "cort_somestesica", target: "cort_associativa", dir: "integrative", cat: "integr", via: "Fibre di associazione (2° e 3° strato, brevi o lunghe nello stesso emisfero) e commessurali (Corpo Calloso tra i due emisferi) [Fonte 1, 3]" },
+      { source: "cort_associativa", target: "cort_motoria", dir: "integrative", cat: "integr", via: "Sistemi di associazione e commessurali del 2° e 3° strato che collegano moduli e colonne corticali [Fonte 1, 3]" },
+      { source: "cort_motoria", target: "d_talamo_vpl_vpm", dir: "efferent", cat: "som_mot", via: "Efferenze cortico-talamiche originate dal 6° strato polimorfo della corteccia [Fonte 1]" },
+
+      // 8. Grandi Vie Discendenti Motorie Somatiche, Visceroeffettrici e Controllo del Dolore
+      { source: "cort_motoria", target: "te_nuclei_motori_cranici", dir: "efferent", cat: "som_mot", via: "Tratto Cortico-Nucleare (Piramidale, dal 5° strato a glutammato attraverso corona radiata e capsula interna) ai nuclei somatomotori dei nervi cranici [Fonte 1, 2, 3]" },
+      { source: "cort_motoria", target: "ms_corno_ant", dir: "efferent", cat: "som_mot", via: "Tratto Cortico-Spinale (Piramidale, dal 5° strato a glutammato) direttamente o tramite interneuroni sui motoneuroni inferiori delle corna anteriori [Fonte 1, 2, 3]" },
+      { source: "te_rubro_tettale_reticolare", target: "ms_corno_ant", dir: "efferent", cat: "som_mot", via: "Via Rubrospinale (dalla porzione magnicellulare del nucleo rosso: attiva flessori arti inf. e inibisce flessori arti sup.), Sistema Reticolospinale e Tratto Tettospinale [Fonte 1, 2]" },
+      { source: "te_vestibolo_cocleare", target: "ms_corno_ant", dir: "efferent", cat: "som_mot", via: "Sistema Vestibolospinale e Fascicolo Longitudinale Mediale / fascio vestibolo-spinale anteriore (dal nucleo vestibolare mediale ai motoneuroni cervicali) [Fonte 1, 2]" },
+      { source: "te_rubro_tettale_reticolare", target: "ms_corno_post", dir: "efferent", cat: "visc_mot", via: "Vie discendenti del controllo centrale del dolore: Sostanza Grigia Periacqueduttale (PAG), Nuclei del Rafe (rafe-spinale) e Nucleo Paragigantocellulare Bulbare [Fonte 2]" },
+      { source: "d_ipotalamo", target: "te_nuclei_motori_cranici", dir: "efferent", cat: "visc_mot", via: "Impulsi ipotalamici diretti e indiretti (via formazione reticolare) ai centri visceroeffettori dei nervi cranici [Fonte 2]" },
+      { source: "d_ipotalamo", target: "ms_corno_ant", dir: "efferent", cat: "visc_mot", via: "Impulsi ipotalamici diretti e indiretti (via formazione reticolare) ai centri visceroeffettori del midollo spinale [Fonte 2]" },
+      { source: "lim_amigdala", target: "te_nuclei_motori_cranici", dir: "efferent", cat: "visc_mot", via: "Impulsi diretti dall'amigdala (e dall'area del setto) ai neuroni visceroeffettori [Fonte 2]" },
+      { source: "cort_insula_cingolo", target: "te_nuclei_motori_cranici", dir: "efferent", cat: "visc_mot", via: "Impulsi diretti da aree corticali (insula, corteccia prefrontale mediale) ai neuroni visceroeffettori cranici e spinali [Fonte 2]" },
+      { source: "ms_corno_ant", target: "snp_nervi_effettori", dir: "efferent", cat: "som_mot", via: "Radice anteriore (in rosso e verde): assoni di alfa-motoneuroni (Aα, fibre extrafusali), gamma-motoneuroni (Aγ, fibre intrafusali) e fibre pregangliari autonome (tipo B) [Fonte 1, 2, 4]" },
+      { source: "te_nuclei_motori_cranici", target: "snp_nervi_effettori", dir: "efferent", cat: "som_mot", via: "Nervi cranici motori e misti (III-XII) ai muscoli striati di testa/collo e fibre pregangliari parasimpatiche ai gangli viscerali [Fonte 1, 2, 4, 9]" },
+      { source: "cort_motoria", target: "via_piramidale", dir: "pathway_link", cat: "via_hub", via: "Origine dal motoneurone superiore del 5° strato corticale [Fonte 1, 2, 3]" },
+      { source: "via_piramidale", target: "ms_corno_ant", dir: "pathway_link", cat: "via_hub", via: "Convergenza sulla via finale comune somatomotrice [Fonte 2]" },
+      { source: "te_rubro_tettale_reticolare", target: "via_extrapiramidale", dir: "pathway_link", cat: "via_hub", via: "Origine troncoencefalica dei fasci rubro-, reticolo-, tetto- e rafe-spinale [Fonte 1, 2]" },
+      { source: "via_extrapiramidale", target: "ms_corno_ant", dir: "pathway_link", cat: "via_hub", via: "Controllo dei movimenti automatici, posturali e della deambulazione [Fonte 1, 2, 4]" }
+    ];
+
+    /*************************************************************************
+     * 6. STATO GLOBALE ACTIVE RECALL & MOTORE GRAFICO
+     *************************************************************************/
+    const canvas = document.getElementById("graphCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let width = window.innerWidth;
+    let height = window.innerHeight - 62;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    let currentScheme = "standard";
+    let layoutMode = "obsidian";
+    let blindMapMode = false;
+    let sheetArActive = false;
+    let sheetArFilter = "all"; // 'all' | 'targets' | 'vias'
+    let filterDir = "all";
+    let filterRegion = "all";
+    let searchQuery = "";
+    let hoveredNode = null;
+    let selectedNode = null;
+    let draggedNode = null;
+
+    // Contatori Active Recall
+    let arStats = { ok: 0, retry: 0, evaluatedIds: {} };
+
+    function updateScoreUI() {
+      document.getElementById("globalScorePill").textContent = `✓ ${arStats.ok} | ✗ ${arStats.retry}`;
+    }
+
+    window.recordEval = function(itemId, status, btnEl) {
+      const prev = arStats.evaluatedIds[itemId];
+      if (prev === "ok") arStats.ok--;
+      if (prev === "retry") arStats.retry--;
+
+      arStats.evaluatedIds[itemId] = status;
+      if (status === "ok") arStats.ok++;
+      if (status === "retry") arStats.retry++;
+
+      const parent = btnEl.parentElement;
+      parent.querySelectorAll(".eval-btn").forEach(b => {
+        b.classList.remove("selected-ok", "selected-retry");
+      });
+      btnEl.classList.add(status === "ok" ? "selected-ok" : "selected-retry");
+      updateScoreUI();
+    };
+
+    window.toggleMask = function(el) {
+      if (el.classList.contains("hidden-fact")) {
+        el.classList.remove("hidden-fact");
+        el.classList.add("revealed-fact");
+      }
+    };
+
+    window.setAllMasks = function(hide) {
+      document.querySelectorAll("#modalBodyContent .ar-mask").forEach(el => {
+        if (hide) {
+          el.classList.add("hidden-fact");
+          el.classList.remove("revealed-fact");
+        } else {
+          el.classList.remove("hidden-fact");
+          el.classList.add("revealed-fact");
+        }
+      });
+    };
+
+    // Camera
+    let camera = { x: width / 2, y: height / 2, zoom: 0.85 };
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+
+    const nodeMap = {};
+    NODES.forEach((n, idx) => {
+      n.degree = 0;
+      const angle = (idx / NODES.length) * Math.PI * 2;
+      const radius = n.isPathway ? 190 : (120 + n.layer * 55);
+      n.x = Math.cos(angle) * radius + (Math.random() - 0.5) * 30;
+      n.y = Math.sin(angle) * radius + (Math.random() - 0.5) * 30;
+      n.vx = 0;
+      n.vy = 0;
+      nodeMap[n.id] = n;
+    });
+
+    LINKS.forEach(l => {
+      if (nodeMap[l.source]) nodeMap[l.source].degree++;
+      if (nodeMap[l.target]) nodeMap[l.target].degree++;
+      l.pulseOffset = Math.random();
+    });
+
+    function getNodeColor(node) {
+      const scheme = COLOR_SCHEMES[currentScheme].categories;
+      if (currentScheme === "papez_gangli" && node.specCat) {
+        return (scheme[node.specCat] || scheme.integr).color;
+      }
+      return (scheme[node.cat] || scheme.integr).color;
+    }
+
+    function getLinkColor(link) {
+      const scheme = COLOR_SCHEMES[currentScheme].categories;
+      if (currentScheme === "papez_gangli" && link.specCat) {
+        return (scheme[link.specCat] || scheme.integr).color;
+      }
+      return (scheme[link.cat] || scheme.integr).color;
+    }
+
+    function updateLegendUI() {
+      const schemeObj = COLOR_SCHEMES[currentScheme];
+      document.getElementById("schemeLabel").textContent = schemeObj.label;
+      const container = document.getElementById("legendColors");
+      container.innerHTML = "";
+      Object.values(schemeObj.categories).forEach(c => {
+        const div = document.createElement("div");
+        div.className = "legend-item";
+        div.innerHTML = `<span class="color-dot" style="background:${c.color};box-shadow:0 0 6px ${c.color}"></span><span>${c.name}</span>`;
+        container.appendChild(div);
+      });
+    }
+
+    function isNodeVisible(node) {
+      if (filterRegion !== "all" && node.region !== filterRegion) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchSelf = node.label.toLowerCase().includes(q) || node.desc.toLowerCase().includes(q);
+        const matchEdge = LINKS.some(l =>
+          (l.source === node.id || l.target === node.id) && l.via.toLowerCase().includes(q)
+        );
+        return matchSelf || matchEdge;
+      }
+      return true;
+    }
+
+    function isLinkVisible(link) {
+      if (filterDir !== "all" && link.dir !== filterDir) return false;
+      const s = nodeMap[link.source];
+      const t = nodeMap[link.target];
+      if (!isNodeVisible(s) && !isNodeVisible(t)) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return s.label.toLowerCase().includes(q) ||
+               t.label.toLowerCase().includes(q) ||
+               link.via.toLowerCase().includes(q);
+      }
+      return true;
+    }
+
+    function stepPhysics() {
+      if (layoutMode === "obsidian") {
+        for (let i = 0; i < NODES.length; i++) {
+          for (let j = i + 1; j < NODES.length; j++) {
+            const a = NODES[i];
+            const b = NODES[j];
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            let distSq = dx * dx + dy * dy + 0.1;
+            let dist = Math.sqrt(distSq);
+            let force = 4200 / distSq;
+            let fx = (dx / dist) * force;
+            let fy = (dy / dist) * force;
+            a.vx -= fx;
+            a.vy -= fy;
+            b.vx += fx;
+            b.vy += fy;
+          }
+        }
+
+        LINKS.forEach(l => {
+          const s = nodeMap[l.source];
+          const t = nodeMap[l.target];
+          let dx = t.x - s.x;
+          let dy = t.y - s.y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          let targetDist = l.dir === "pathway_link" ? 130 : 165;
+          let force = (dist - targetDist) * 0.018;
+          let fx = (dx / dist) * force;
+          let fy = (dy / dist) * force;
+          s.vx += fx;
+          s.vy += fy;
+          t.vx -= fx;
+          t.vy -= fy;
+        });
+
+        NODES.forEach(n => {
+          n.vx -= n.x * 0.0042;
+          n.vy -= n.y * 0.0042;
+        });
+      } else {
+        const layers = {};
+        NODES.forEach(n => {
+          if (!layers[n.layer]) layers[n.layer] = [];
+          layers[n.layer].push(n);
+        });
+        Object.keys(layers).forEach(layerIdx => {
+          const arr = layers[layerIdx];
+          const targetY = (3 - Number(layerIdx)) * 140;
+          arr.forEach((n, idx) => {
+            const targetX = (idx - (arr.length - 1) / 2) * 175;
+            n.vx += (targetX - n.x) * 0.08;
+            n.vy += (targetY - n.y) * 0.08;
+          });
+        });
+      }
+
+      NODES.forEach(n => {
+        if (n === draggedNode) return;
+        n.vx *= 0.82;
+        n.vy *= 0.82;
+        n.x += n.vx;
+        n.y += n.vy;
+      });
+    }
+
+    function drawArrowhead(x, y, angle, size, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-size, -size * 0.55);
+      ctx.lineTo(-size, size * 0.55);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawDiamond(x, y, r) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+    }
+
+    function render() {
+      stepPhysics();
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      ctx.translate(camera.x, camera.y);
+      ctx.scale(camera.zoom, camera.zoom);
+
+      const activeFocus = hoveredNode || selectedNode;
+      const connectedNodeIds = new Set();
+      if (activeFocus) {
+        connectedNodeIds.add(activeFocus.id);
+        LINKS.forEach(l => {
+          if (!isLinkVisible(l)) return;
+          if (l.source === activeFocus.id) connectedNodeIds.add(l.target);
+          if (l.target === activeFocus.id) connectedNodeIds.add(l.source);
+        });
+      }
+
+      // 1. ARCHI
+      LINKS.forEach(l => {
+        if (!isLinkVisible(l)) return;
+        const s = nodeMap[l.source];
+        const t = nodeMap[l.target];
+        const isHighlighted = activeFocus && (l.source === activeFocus.id || l.target === activeFocus.id);
+        const isDimmed = activeFocus && !isHighlighted;
+
+        const color = getLinkColor(l);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = isDimmed ? 0.08 : (isHighlighted ? 0.95 : 0.44);
+        ctx.lineWidth = isHighlighted ? 2.4 : 1.3;
+
+        if (l.dir === "efferent") {
+          ctx.setLineDash([7, 4]);
+        } else if (l.dir === "integrative") {
+          ctx.setLineDash([2, 4]);
+        } else {
+          ctx.setLineDash([]);
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(t.x, t.y);
+        ctx.stroke();
+
+        const dx = t.x - s.x;
+        const dy = t.y - s.y;
+        const angle = Math.atan2(dy, dx);
+        const targetRadius = 9 + Math.min(t.degree * 1.1, 14);
+        const arrowX = t.x - Math.cos(angle) * (targetRadius + 3);
+        const arrowY = t.y - Math.sin(angle) * (targetRadius + 3);
+
+        if (l.dir !== "pathway_link") {
+          drawArrowhead(arrowX, arrowY, angle, isHighlighted ? 8 : 6, color);
+        }
+
+        if (!isDimmed && (l.dir === "afferent" || l.dir === "efferent")) {
+          l.pulseOffset = (l.pulseOffset + (l.dir === "efferent" ? 0.0065 : 0.0042)) % 1;
+          const px = s.x + dx * l.pulseOffset;
+          const py = s.y + dy * l.pulseOffset;
+          ctx.setLineDash([]);
+          ctx.globalAlpha = isHighlighted ? 1 : 0.78;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(px, py, isHighlighted ? 3.2 : 2.1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
+      // 2. NODI
+      NODES.forEach(n => {
+        const visible = isNodeVisible(n);
+        const isFocus = activeFocus && activeFocus.id === n.id;
+        const isNeighbor = activeFocus && connectedNodeIds.has(n.id);
+        const isDimmed = !visible || (activeFocus && !isNeighbor);
+
+        const radius = (n.isPathway ? 11 : 8) + Math.min(n.degree * 1.05, 13);
+        const color = getNodeColor(n);
+
+        ctx.save();
+        ctx.globalAlpha = isDimmed ? 0.14 : 1;
+
+        if (isFocus || isNeighbor) {
+          if (n.isPathway) {
+            drawDiamond(n.x, n.y, radius + 6);
+          } else {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, radius + 5, 0, Math.PI * 2);
+          }
+          ctx.fillStyle = color;
+          ctx.globalAlpha = isFocus ? 0.35 : 0.16;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        if (n.isPathway) {
+          drawDiamond(n.x, n.y, radius);
+          ctx.fillStyle = isFocus ? color : "#1e1b4b";
+          ctx.fill();
+          ctx.lineWidth = isFocus ? 3 : 2.2;
+          ctx.strokeStyle = color;
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = isFocus ? color : "#161f2c";
+          ctx.fill();
+          ctx.lineWidth = isFocus ? 3 : 2.2;
+          ctx.strokeStyle = color;
+          ctx.stroke();
+        }
+
+        // Etichetta (nascosta in Mappa Muta finché non selezioni il nodo)
+        ctx.font = `${isFocus || n.isPathway ? "600" : "500"} 11px Inter, sans-serif`;
+        ctx.textAlign = "center";
+        if (blindMapMode && !isFocus) {
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillText(n.isPathway ? "💎 [ ? Via ? ]" : `[ ? ${n.region} ? ]`, n.x, n.y + radius + 14);
+        } else {
+          ctx.fillStyle = isFocus ? "#ffffff" : (n.isPathway ? "#5eead4" : "#cbd5e1");
+          ctx.fillText(n.label, n.x, n.y + radius + 14);
+        }
+
+        ctx.restore();
+      });
+
+      ctx.restore();
+      requestAnimationFrame(render);
+    }
+
+    /*************************************************************************
+     * 7. SIDEBAR E SCHEDA CON ACTIVE RECALL INTEGRATO
+     *************************************************************************/
+    function screenToWorld(sx, sy) {
+      return {
+        x: (sx - camera.x) / camera.zoom,
+        y: (sy - camera.y) / camera.zoom
+      };
+    }
+
+    function getNodeAt(wx, wy) {
+      for (let i = NODES.length - 1; i >= 0; i--) {
+        const n = NODES[i];
+        const r = 11 + Math.min(n.degree * 1.05, 13);
+        const dx = wx - n.x;
+        const dy = wy - n.y;
+        if (dx * dx + dy * dy <= r * r) return n;
+      }
+      return null;
+    }
+
+    function focusAndInspect(node) {
+      selectedNode = node;
+      camera.x = width / 2 - node.x * camera.zoom;
+      camera.y = height / 2 - node.y * camera.zoom;
+      openInspector(node);
+    }
+
+    function openInspector(node) {
+      selectedNode = node;
+      const panel = document.getElementById("inspectorPanel");
+      panel.classList.add("open");
+
+      const color = getNodeColor(node);
+      const badge = document.getElementById("inspBadge");
+      badge.textContent = node.isPathway ? "💎 GRANDE VIA NERVOSA" : `STRUTTURA // ${node.region}`;
+      badge.style.background = `${color}28`;
+      badge.style.color = color;
+      badge.style.border = `1px solid ${color}`;
+
+      document.getElementById("inspTitle").textContent = node.label;
+      document.getElementById("inspDesc").textContent = node.desc;
+
+      const pathwayContainer = document.getElementById("inspPathways");
+      pathwayContainer.innerHTML = "";
+      const linkedPathways = new Set();
+      if (node.isPathway) linkedPathways.add(node.id);
+
+      LINKS.forEach(l => {
+        if (l.source === node.id && nodeMap[l.target]?.isPathway) linkedPathways.add(l.target);
+        if (l.target === node.id && nodeMap[l.source]?.isPathway) linkedPathways.add(l.source);
+      });
+
+      NODES.filter(n => n.isPathway && n.chain).forEach(pNode => {
+        if (pNode.chain.some(step => step.nodeId === node.id)) {
+          linkedPathways.add(pNode.id);
+        }
+      });
+
+      linkedPathways.forEach(pid => {
+        const pNode = nodeMap[pid];
+        if (!pNode) return;
+        const pill = document.createElement("span");
+        pill.className = "pathway-pill";
+        pill.textContent = pNode.label.replace("VIA: ", "💎 ");
+        pill.addEventListener("click", () => {
+          focusAndInspect(pNode);
+          openSheetModal(pNode, sheetArActive);
+        });
+        pathwayContainer.appendChild(pill);
+      });
+
+      const affContainer = document.getElementById("inspAfferents");
+      const effContainer = document.getElementById("inspEfferents");
+      const intContainer = document.getElementById("inspIntegrative");
+      affContainer.innerHTML = "";
+      effContainer.innerHTML = "";
+      intContainer.innerHTML = "";
+
+      let aCount = 0, eCount = 0, iCount = 0;
+
+      LINKS.forEach(l => {
+        if (l.dir === "pathway_link") return;
+        if (l.target === node.id && l.dir !== "integrative") {
+          aCount++;
+          affContainer.appendChild(createConnCard(nodeMap[l.source], l, "Da:"));
+        } else if (l.source === node.id && l.dir !== "integrative") {
+          eCount++;
+          effContainer.appendChild(createConnCard(nodeMap[l.target], l, "Verso:"));
+        } else if ((l.source === node.id || l.target === node.id) && l.dir === "integrative") {
+          iCount++;
+          const other = nodeMap[l.source === node.id ? l.target : l.source];
+          intContainer.appendChild(createConnCard(other, l, "Con:"));
+        }
+      });
+
+      document.getElementById("affCount").textContent = aCount;
+      document.getElementById("effCount").textContent = eCount;
+      document.getElementById("intCount").textContent = iCount;
+    }
+
+    function createConnCard(targetNode, link, prefix) {
+      const card = document.createElement("div");
+      card.className = "conn-card";
+      card.style.borderLeftColor = getLinkColor(link);
+      const dirBadge = link.dir === "afferent" ? "AFFERENZA" : (link.dir === "efferent" ? "EFFERENZA" : "RECIPROCO");
+      card.innerHTML = `
+        <div class="conn-card-target">
+          <span>${prefix} ${targetNode.label}</span>
+          <span style="color:${getLinkColor(link)};font-size:0.66rem;white-space:nowrap;">${dirBadge}</span>
+        </div>
+        <div class="conn-card-via">${link.via}</div>
+      `;
+      card.addEventListener("click", () => focusAndInspect(targetNode));
+      return card;
+    }
+
+    function renderEvalButtons(itemId) {
+      if (!sheetArActive) return "";
+      const state = arStats.evaluatedIds[itemId];
+      return `
+        <span class="ar-self-eval">
+          <button class="eval-btn eval-ok ${state === 'ok' ? 'selected-ok' : ''}" onclick="event.stopPropagation(); window.recordEval('${itemId}', 'ok', this)">✓ So</button>
+          <button class="eval-btn eval-retry ${state === 'retry' ? 'selected-retry' : ''}" onclick="event.stopPropagation(); window.recordEval('${itemId}', 'retry', this)">✗ Ripassa</button>
+        </span>
+      `;
+    }
+
+    function wrapArMask(content, type) {
+      if (!sheetArActive) return content;
+      const shouldHide =
+        sheetArFilter === "all" ||
+        (sheetArFilter === "targets" && type === "target") ||
+        (sheetArFilter === "vias" && type === "via");
+      if (!shouldHide) return content;
+      return `<span class="ar-mask hidden-fact" onclick="event.stopPropagation(); window.toggleMask(this)"><span>${content}</span></span>`;
+    }
+
+    // Costruzione della Scheda Interattiva Completa (Modal) con Active Recall
+    function openSheetModal(node, forceAr = null) {
+      if (forceAr !== null) sheetArActive = forceAr;
+      selectedNode = node;
+
+      const modal = document.getElementById("sheetModal");
+      const badge = document.getElementById("modalBadge");
+      const title = document.getElementById("modalTitle");
+      const body = document.getElementById("modalBodyContent");
+      const arBtn = document.getElementById("toggleSheetArBtn");
+
+      arBtn.textContent = sheetArActive ? "🎯 Modalità Active Recall: ON" : "🎯 Modalità Active Recall: OFF";
+      arBtn.classList.toggle("active", sheetArActive);
+
+      const color = getNodeColor(node);
+      badge.textContent = node.isPathway ? "💎 SCHEDA GRANDE VIA NERVOSA" : `SCHEDA STRUTTURA ANATOMICA // ${node.region}`;
+      badge.style.background = `${color}28`;
+      badge.style.color = color;
+      badge.style.border = `1px solid ${color}`;
+      title.textContent = node.label;
+
+      let html = "";
+
+      // Barra di controllo Active Recall
+      if (sheetArActive) {
+        html += `
+          <div class="ar-toolbar">
+            <div class="ar-toolbar-left">
+              <span class="ar-badge-title">🧠 Active Recall Attivo: clicca sulle caselle arancioni per svelare e autovalutati</span>
+              <select class="select-ctrl" onchange="window.changeSheetArFilter(this.value)">
+                <option value="all" ${sheetArFilter === 'all' ? 'selected' : ''}>Oscura: Tutto (Stazioni + Bersagli + Fasci/NT)</option>
+                <option value="targets" ${sheetArFilter === 'targets' ? 'selected' : ''}>Oscura: Solo Strutture e Neuroni I/II/III</option>
+                <option value="vias" ${sheetArFilter === 'vias' ? 'selected' : ''}>Oscura: Solo Fasci, Decussazioni e Neurotrasmettitori</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-ctrl" onclick="window.setAllMasks(false)">👁️ Svela Tutto</button>
+              <button class="btn-ctrl" onclick="window.setAllMasks(true)">🙈 Nascondi Tutto</button>
+            </div>
+          </div>
+        `;
+      }
+
+      html += `<div class="node-desc" style="font-size:0.9rem;">${wrapArMask(node.desc, "via")}</div>`;
+
+      // Catena Neuronale passo-passo (con oscuramento Active Recall per ciascun neurone)
+      const relevantPathways = node.isPathway
+        ? [node]
+        : NODES.filter(n => n.isPathway && n.chain && n.chain.some(s => s.nodeId === node.id));
+
+      relevantPathways.forEach(pNode => {
+        if (!pNode.chain) return;
+        html += `
+          <div class="chain-container">
+            <div class="chain-title">⚡ Catena Neuronale Passo-Passo: ${pNode.label}</div>
+            <div class="chain-steps">
+              ${pNode.chain.map((st, idx) => {
+                const evalId = `chain_${pNode.id}_${idx}`;
+                const stName = nodeMap[st.nodeId] ? nodeMap[st.nodeId].label : st.nodeId;
+                return `
+                  <div class="chain-step">
+                    <div class="chain-step-num">
+                      <span>${st.step}</span>
+                      ${renderEvalButtons(evalId)}
+                    </div>
+                    <div class="chain-step-name">${wrapArMask(stName, "target")}</div>
+                    <div style="font-size:0.74rem;color:#94a3b8;margin-top:2px;">${wrapArMask(st.detail, "via")}</div>
+                    <button class="btn-ctrl" style="margin-top:6px;font-size:0.68rem;padding:3px 6px;" onclick="window.jumpToNodeFromModal('${st.nodeId}')">
+                      Vai al nodo →
+                    </button>
+                  </div>
+                  ${idx < pNode.chain.length - 1 ? `<span class="chain-arrow">──▶</span>` : ""}
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      });
+
+      // Griglia Afferenze ed Efferenze con Active Recall
+      const incoming = LINKS.filter(l => l.target === node.id && l.dir !== "pathway_link");
+      const outgoing = LINKS.filter(l => l.source === node.id && l.dir !== "pathway_link");
+
+      html += `
+        <div class="modal-grid">
+          <div class="modal-box">
+            <h4>📥 Afferenze / Connessioni in Entrata (${incoming.length})</h4>
+            <div class="conn-list">
+              ${incoming.length ? incoming.map((l, i) => {
+                const evalId = `aff_${node.id}_${i}`;
+                return `
+                  <div class="conn-card">
+                    <div class="conn-card-target">
+                      <span>Da: ${wrapArMask(nodeMap[l.source].label, "target")}</span>
+                      ${renderEvalButtons(evalId)}
+                    </div>
+                    <div class="conn-card-via">${wrapArMask(l.via, "via")}</div>
+                    <div style="margin-top:5px;">
+                      <button class="btn-ctrl" style="font-size:0.66rem;padding:2px 6px;" onclick="window.jumpToNodeFromModal('${l.source}')">Apri nodo sorgente →</button>
+                    </div>
+                  </div>
+                `;
+              }).join("") : `<div style="color:#64748b;font-size:0.8rem;">Origine recettoriale periferica o nodo di partenza.</div>`}
+            </div>
+          </div>
+          <div class="modal-box">
+            <h4>📤 Efferenze / Connessioni in Uscita (${outgoing.length})</h4>
+            <div class="conn-list">
+              ${outgoing.length ? outgoing.map((l, i) => {
+                const evalId = `eff_${node.id}_${i}`;
+                return `
+                  <div class="conn-card">
+                    <div class="conn-card-target">
+                      <span>Verso: ${wrapArMask(nodeMap[l.target].label, "target")}</span>
+                      ${renderEvalButtons(evalId)}
+                    </div>
+                    <div class="conn-card-via">${wrapArMask(l.via, "via")}</div>
+                    <div style="margin-top:5px;">
+                      <button class="btn-ctrl" style="font-size:0.66rem;padding:2px 6px;" onclick="window.jumpToNodeFromModal('${l.target}')">Apri nodo bersaglio →</button>
+                    </div>
+                  </div>
+                `;
+              }).join("") : `<div style="color:#64748b;font-size:0.8rem;">Stazione corticale terminale o organo effettore periferico.</div>`}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modInfo = SITO_VIE_MODULES[node.moduleKey] || SITO_VIE_MODULES.gangli_base_corteccia;
+      html += `
+        <div class="ext-module-bar">
+          <div>
+            <div style="font-size:0.72rem;text-transform:uppercase;color:#5eead4;font-weight:700;">Collegamento al Sito delle Vie Nervose</div>
+            <div style="font-size:0.9rem;font-weight:600;color:#fff;">${modInfo.title}</div>
+          </div>
+          <button class="ext-link-btn" onclick="window.filterByModule('${node.moduleKey}')">
+            Isola questa Via sulla Mappa →
+          </button>
+        </div>
+      `;
+
+      body.innerHTML = html;
+      modal.classList.add("active");
+    }
+
+    window.changeSheetArFilter = function(val) {
+      sheetArFilter = val;
+      if (selectedNode) openSheetModal(selectedNode, true);
+    };
+
+    /*************************************************************************
+     * 8. CENTRO QUIZ ACTIVE RECALL (3 MODALITÀ DI STUDIO INTERATTIVE)
+     *************************************************************************/
+    let quizDeck = [];
+    let quizIndex = 0;
+    let quizMode = "chains"; // 'chains' | 'connections' | 'fibers'
+
+    function buildQuizDeck(mode) {
+      quizMode = mode;
+      quizDeck = [];
+
+      if (mode === "chains") {
+        NODES.filter(n => n.isPathway && n.chain).forEach(p => {
+          quizDeck.push({
+            id: `q_chain_${p.id}`,
+            nodeId: p.id,
+            category: "💎 Ricostruzione Grande Via Nervosa",
+            question: `Qual è la catena neuronale completa (I, II, III neurone, decussazione/peduncolo e terminazione) di: "${p.label}"?`,
+            answerHtml: `
+              <div style="margin-bottom:10px;color:#94a3b8;">${p.desc}</div>
+              <div class="chain-steps">
+                ${p.chain.map(s => `
+                  <div class="chain-step">
+                    <div class="chain-step-num">${s.step}</div>
+                    <div class="chain-step-name">${nodeMap[s.nodeId] ? nodeMap[s.nodeId].label : s.nodeId}</div>
+                    <div style="font-size:0.74rem;color:#94a3b8;">${s.detail}</div>
+                  </div>
+                `).join("")}
+              </div>
+            `
+          });
+        });
+      } else if (mode === "connections") {
+        NODES.filter(n => !n.isPathway).forEach(n => {
+          const affs = LINKS.filter(l => l.target === n.id && l.dir !== "pathway_link");
+          const effs = LINKS.filter(l => l.source === n.id && l.dir !== "pathway_link");
+          quizDeck.push({
+            id: `q_conn_${n.id}`,
+            nodeId: n.id,
+            category: `🧠 Afferenze & Efferenze // ${n.region}`,
+            question: `Quali sono tutte le Afferenze (in entrata) e le Efferenze (in uscita) di: "${n.label}"?`,
+            answerHtml: `
+              <div style="margin-bottom:10px;color:#cbd5e1;">${n.desc}</div>
+              <div class="modal-grid">
+                <div>
+                  <strong style="color:#38bdf8;">📥 Afferenze (${affs.length}):</strong>
+                  <ul style="margin-top:6px;padding-left:18px;font-size:0.8rem;">
+                    ${affs.map(a => `<li><strong>${nodeMap[a.source].label}</strong>: ${a.via}</li>`).join("") || "<li>Origine periferica</li>"}
+                  </ul>
+                </div>
+                <div>
+                  <strong style="color:#ef4444;">📤 Efferenze (${effs.length}):</strong>
+                  <ul style="margin-top:6px;padding-left:18px;font-size:0.8rem;">
+                    ${effs.map(e => `<li><strong>${nodeMap[e.target].label}</strong>: ${e.via}</li>`).join("") || "<li>Stazione terminale</li>"}
+                  </ul>
+                </div>
+              </div>
+            `
+          });
+        });
+      } else if (mode === "fibers") {
+        FIBER_RECEPTOR_CARDS.forEach((c, idx) => {
+          quizDeck.push({
+            id: `q_fib_${idx}`,
+            nodeId: "rec_estero_proprio",
+            category: `⚡ Classificazione Fibre & Recettori (${c.source})`,
+            question: c.q,
+            answerHtml: `<div style="font-size:0.95rem;color:#f8fafc;">${c.a}</div>`
+          });
+        });
+      }
+
+      quizIndex = 0;
+      renderQuizModal();
+    }
+
+    window.shuffleQuizDeck = function() {
+      for (let i = quizDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [quizDeck[i], quizDeck[j]] = [quizDeck[j], quizDeck[i]];
+      }
+      quizIndex = 0;
+      renderQuizModal();
+    };
+
+    window.StepQuiz = function(delta) {
+      quizIndex = (quizIndex + delta + quizDeck.length) % quizDeck.length;
+      renderQuizModal();
+    };
+
+    function renderQuizModal() {
+      const modal = document.getElementById("sheetModal");
+      const badge = document.getElementById("modalBadge");
+      const title = document.getElementById("modalTitle");
+      const body = document.getElementById("modalBodyContent");
+      const arBtn = document.getElementById("toggleSheetArBtn");
+
+      arBtn.style.display = "none";
+      badge.textContent = "🎯 CENTRO ADDESTRAMENTO ACTIVE RECALL";
+      badge.style.background = "rgba(245, 158, 11, 0.22)";
+      badge.style.color = "#fbbf24";
+      badge.style.border = "1px solid #f59e0b";
+      title.textContent = `Flashcard & Catene Neuronali (${quizIndex + 1} di ${quizDeck.length})`;
+
+      const card = quizDeck[quizIndex];
+      if (card.nodeId && nodeMap[card.nodeId]) {
+        focusAndInspect(nodeMap[card.nodeId]);
+      }
+
+      const evalState = arStats.evaluatedIds[card.id];
+
+      body.innerHTML = `
+        <div class="ar-toolbar">
+          <div class="ar-toolbar-left">
+            <button class="btn-ctrl ${quizMode === 'chains' ? 'active' : ''}" onclick="window.switchQuizMode('chains')">
+              1. Catene Neuronali (12 Vie)
+            </button>
+            <button class="btn-ctrl ${quizMode === 'connections' ? 'active' : ''}" onclick="window.switchQuizMode('connections')">
+              2. Afferenze, Efferenze &amp; NT (24 Nodi)
+            </button>
+            <button class="btn-ctrl ${quizMode === 'fibers' ? 'active' : ''}" onclick="window.switchQuizMode('fibers')">
+              3. Fibre (Aα-C) &amp; Recettori (8 Carte)
+            </button>
+          </div>
+          <button class="btn-ctrl" onclick="window.shuffleQuizDeck()">🔀 Mescola Mazzo</button>
+        </div>
+
+        <div class="quiz-deck-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.76rem;font-weight:700;color:#2dd4bf;text-transform:uppercase;">${card.category}</span>
+            <span style="font-size:0.76rem;color:#94a3b8;">Carta ${quizIndex + 1} / ${quizDeck.length}</span>
+          </div>
+
+          <div class="quiz-question">${card.question}</div>
+
+          <div id="quizAnswerContainer" style="display:none;" class="quiz-answer-box">
+            ${card.answerHtml}
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px;">
+            <button class="open-ar-sheet-btn" id="revealQuizAnsBtn" onclick="document.getElementById('quizAnswerContainer').style.display='block'; this.style.display='none';">
+              👁️ Svela Risposta Completa
+            </button>
+
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="eval-btn eval-ok ${evalState === 'ok' ? 'selected-ok' : ''}" style="padding:8px 14px;font-size:0.8rem;" onclick="window.recordEval('${card.id}', 'ok', this); window.StepQuiz(1);">
+                ✓ Ricordato (Avanti →)
+              </button>
+              <button class="eval-btn eval-retry ${evalState === 'retry' ? 'selected-retry' : ''}" style="padding:8px 14px;font-size:0.8rem;" onclick="window.recordEval('${card.id}', 'retry', this); window.StepQuiz(1);">
+                ✗ Da ripassare (Avanti →)
+              </button>
+            </div>
+
+            <div style="display:flex;gap:6px;">
+              <button class="btn-ctrl" onclick="window.StepQuiz(-1)">← Precedente</button>
+              <button class="btn-ctrl" onclick="window.StepQuiz(1)">Successiva →</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      modal.classList.add("active");
+    }
+
+    window.switchQuizMode = function(mode) {
+      buildQuizDeck(mode);
+    };
+
+    // Indice generale di tutte le Grandi Vie Nervose e Strutture
+    function openFullIndexModal() {
+      const modal = document.getElementById("sheetModal");
+      const badge = document.getElementById("modalBadge");
+      const title = document.getElementById("modalTitle");
+      const body = document.getElementById("modalBodyContent");
+      document.getElementById("toggleSheetArBtn").style.display = "none";
+
+      badge.textContent = "📚 INDICE GENERALE INTERATTIVO";
+      badge.style.background = "rgba(45, 212, 191, 0.2)";
+      badge.style.color = "#2dd4bf";
+      title.textContent = "Tutte le Grandi Vie Nervose e Strutture Collegate";
+
+      const pathways = NODES.filter(n => n.isPathway);
+      const structures = NODES.filter(n => !n.isPathway);
+
+      body.innerHTML = `
+        <div class="chain-container">
+          <div class="chain-title">💎 Le 12 Grandi Vie e Circuiti del Sistema Nervoso (Clicca per aprire in modalità Studio o Active Recall)</div>
+          <div class="modal-grid">
+            ${pathways.map(p => `
+              <div class="conn-card" style="border-left-color:#2dd4bf;" onclick="window.jumpToNodeFromModal('${p.id}')">
+                <div class="conn-card-target"><span>${p.label}</span></div>
+                <div class="conn-card-via">${p.desc}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="chain-container">
+          <div class="chain-title">🧠 Tutte le Strutture Anatomiche e Nuclei (${structures.length} Nodi)</div>
+          <div class="modal-grid">
+            ${structures.map(s => `
+              <div class="conn-card" style="border-left-color:${getNodeColor(s)};" onclick="window.jumpToNodeFromModal('${s.id}')">
+                <div class="conn-card-target">
+                  <span>${s.label}</span>
+                  <span style="font-size:0.68rem;color:#94a3b8;">${s.region}</span>
+                </div>
+                <div class="conn-card-via">${s.desc}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+      modal.classList.add("active");
+    }
+
+    window.jumpToNodeFromModal = function(nodeId) {
+      const target = nodeMap[nodeId];
+      if (!target) return;
+      document.getElementById("toggleSheetArBtn").style.display = "inline-block";
+      focusAndInspect(target);
+      openSheetModal(target, sheetArActive);
+    };
+
+    window.filterByModule = function(moduleKey) {
+      document.getElementById("sheetModal").classList.remove("active");
+      const targetNode = NODES.find(n => n.isPathway && n.moduleKey === moduleKey) || selectedNode;
+      if (targetNode) focusAndInspect(targetNode);
+    };
+
+    // Eventi Mouse sul Canvas
+    canvas.addEventListener("mousedown", e => {
+      const rect = canvas.getBoundingClientRect();
+      const pos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      const hit = getNodeAt(pos.x, pos.y);
+      if (hit) {
+        draggedNode = hit;
+        openInspector(hit);
+      } else {
+        isPanning = true;
+        panStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
+      }
+    });
+
+    canvas.addEventListener("dblclick", e => {
+      const rect = canvas.getBoundingClientRect();
+      const pos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      const hit = getNodeAt(pos.x, pos.y);
+      if (hit) {
+        document.getElementById("toggleSheetArBtn").style.display = "inline-block";
+        openSheetModal(hit, sheetArActive);
+      }
+    });
+
+    window.addEventListener("mousemove", e => {
+      const rect = canvas.getBoundingClientRect();
+      const pos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      if (draggedNode) {
+        draggedNode.x = pos.x;
+        draggedNode.y = pos.y;
+      } else if (isPanning) {
+        camera.x = e.clientX - panStart.x;
+        camera.y = e.clientY - panStart.y;
+      } else {
+        hoveredNode = getNodeAt(pos.x, pos.y);
+        canvas.style.cursor = hoveredNode ? "pointer" : "grab";
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      draggedNode = null;
+      isPanning = false;
+    });
+
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      camera.zoom = Math.max(0.25, Math.min(2.6, camera.zoom * zoomFactor));
+    }, { passive: false });
+
+    // Controlli UI
+    document.getElementById("openModalSheetBtn").addEventListener("click", () => {
+      if (selectedNode) {
+        document.getElementById("toggleSheetArBtn").style.display = "inline-block";
+        openSheetModal(selectedNode, false);
+      }
+    });
+
+    document.getElementById("openModalArBtn").addEventListener("click", () => {
+      if (selectedNode) {
+        document.getElementById("toggleSheetArBtn").style.display = "inline-block";
+        openSheetModal(selectedNode, true);
+      }
+    });
+
+    document.getElementById("toggleSheetArBtn").addEventListener("click", () => {
+      sheetArActive = !sheetArActive;
+      if (selectedNode) openSheetModal(selectedNode, sheetArActive);
+    });
+
+    document.getElementById("openQuizBtn").addEventListener("click", () => {
+      buildQuizDeck("chains");
+    });
+
+    document.getElementById("openIndexBtn").addEventListener("click", openFullIndexModal);
+
+    document.getElementById("blindMapBtn").addEventListener("click", e => {
+      blindMapMode = !blindMapMode;
+      e.target.textContent = blindMapMode ? "🙈 Mappa Muta: ON" : "🙈 Mappa Muta: OFF";
+      e.target.classList.toggle("active", blindMapMode);
+    });
+
+    document.getElementById("closeModalBtn").addEventListener("click", () => {
+      document.getElementById("sheetModal").classList.remove("active");
+    });
+
+    document.getElementById("sheetModal").addEventListener("click", e => {
+      if (e.target.id === "sheetModal") {
+        document.getElementById("sheetModal").classList.remove("active");
+      }
+    });
+
+    document.getElementById("closeInspectorBtn").addEventListener("click", () => {
+      selectedNode = null;
+      document.getElementById("inspectorPanel").classList.remove("open");
+    });
+
+    document.getElementById("searchInput").addEventListener("input", e => {
+      searchQuery = e.target.value.trim();
+    });
+
+    document.getElementById("directionFilter").addEventListener("change", e => {
+      filterDir = e.target.value;
+    });
+
+    document.getElementById("regionFilter").addEventListener("change", e => {
+      filterRegion = e.target.value;
+    });
+
+    document.getElementById("colorSchemeSelect").addEventListener("change", e => {
+      currentScheme = e.target.value;
+      updateLegendUI();
+      if (selectedNode) openInspector(selectedNode);
+    });
+
+    document.getElementById("layoutToggleBtn").addEventListener("click", e => {
+      layoutMode = layoutMode === "obsidian" ? "hierarchical" : "obsidian";
+      e.target.textContent = layoutMode === "obsidian" ? "Vista: Grafo Obsidian" : "Vista: Livelli Anatomici";
+      e.target.classList.toggle("active", layoutMode === "hierarchical");
+    });
+
+    document.getElementById("zoomInBtn").addEventListener("click", () => camera.zoom = Math.min(2.6, camera.zoom * 1.2));
+    document.getElementById("zoomOutBtn").addEventListener("click", () => camera.zoom = Math.max(0.25, camera.zoom * 0.8));
+    document.getElementById("zoomResetBtn").addEventListener("click", () => {
+      camera = { x: width / 2, y: height / 2, zoom: 0.85 };
+    });
+
+    window.addEventListener("resize", () => {
+      width = window.innerWidth;
+      height = window.innerHeight - 62;
+      canvas.width = width * window.devicePixelRatio;
+      canvas.height = height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    });
+
+    updateLegendUI();
+    render();
+  </script>
+</body>
+</html>
